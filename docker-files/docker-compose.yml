@@ -1,0 +1,16 @@
+services:
+  calendar-app:
+    build:
+      context: ..
+    ports:
+      - "5050:5050"
+  calendar-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: calendar
+    volumes:
+      - "calendar-db-data:/var/lib/postgresql/data"
+volumes:
+  calendar-db-data:

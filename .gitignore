@@ -1,0 +1,5 @@
+node_modules
+dist
+init-migrations.md
+.dev.env
+.prod.env
