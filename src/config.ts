@@ -13,6 +13,9 @@ const config = {
   app: {
     isDev: mandatoryEnv(process.env.NODE_ENV, "NODE_ENV") === "development",
     port: +mandatoryEnv(process.env.APP_PORT, "APP_PORT"),
+    proto: mandatoryEnv(process.env.APP_PROTO, "APP_PROTO"),
+    host: process.env.APP_HOST || "localhost",
+    uri: `${process.env.APP_PROTO}://${process.env.APP_HOST}:${process.env.APP_PORT}`,
   },
   db: {
     host: mandatoryEnv(process.env.APP_DB_HOST, "APP_DB_HOST"),
