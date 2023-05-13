@@ -27,7 +27,7 @@ const getTokens = async (
     const { tokens } = await appOAuthClient.getToken(authorizationCode);
     return tokens;
   } catch (err) {
-    logger.info(err);
+    logger.info("Failed retrieving Google OAuth tokens: ", err);
     return null;
   }
 };
