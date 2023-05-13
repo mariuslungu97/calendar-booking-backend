@@ -6,6 +6,7 @@ services:
       - "5050:5050"
     depends_on:
       - calendar-db
+      - calendar-redis
   calendar-db:
     image: postgres
     environment:
@@ -14,5 +15,12 @@ services:
       POSTGRES_DB: calendar
     volumes:
       - "calendar-db-data:/var/lib/postgresql/data"
+  calendar-redis:
+    image: redis
+    volumes:
+      - "./redis.conf:/etc/redis/redis.conf"
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "/etc/redis/redis.conf"]
 volumes:
   calendar-db-data:
