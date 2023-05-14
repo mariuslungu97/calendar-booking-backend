@@ -118,6 +118,7 @@ const calendarApi = (
           syncToken: initialSyncToken,
           maxResults: 500,
           singleEvents: true,
+          showDeleted: true,
         });
         const { items, nextPageToken, nextSyncToken } = response.data;
         if (items) events.push(...items);

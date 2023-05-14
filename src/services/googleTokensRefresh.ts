@@ -18,10 +18,12 @@ const refreshTokens = (userId: string, authClient: OAuth2Client) => {
     if (newTokens.access_token) tokens.access_token = newTokens.access_token;
 
     try {
-      await knexClient("connections").where({ user_id: userId }).update({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-      });
+      await knexClient("connections")
+        .where({ user_id: userId, provider: "GOOGLE" })
+        .update({
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+        });
       authClient.setCredentials(tokens);
     } catch (err) {
       logger.info("Failed updating user's GOOGLE 'connection' row: ", err);
