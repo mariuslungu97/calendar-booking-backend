@@ -24,10 +24,17 @@ const config = {
     port: (process.env.APP_DB_PORT && +process.env.APP_DB_PORT) || 5432,
     database: process.env.APP_DB_DATABASE,
   },
+  redis: {
+    host: mandatoryEnv(process.env.APP_REDIS_HOST, "APP_REDIS_HOST"),
+    port: +mandatoryEnv(process.env.APP_REDIS_PORT, "APP_REDIS_PORT") || 6379,
+    user: process.env.APP_REDIS_USER,
+    password: process.env.APP_REDIS_PASSWORD,
+  },
   google: {
     clientId: process.env.APP_GOOGLE_CLIENT_ID,
     clientSecret: process.env.APP_GOOGLE_CLIENT_SECRET,
     redirectUri: process.env.APP_GOOGLE_REDIRECT_URI,
+    calendarWebhookUri: process.env.APP_GOOGLE_CALENDAR_WEBHOOK_URI,
   },
 };
 
