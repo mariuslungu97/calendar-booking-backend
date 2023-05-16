@@ -3,3 +3,4 @@ dist
 init-migrations.md
 .dev.env
 .prod.env
+logs

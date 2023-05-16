@@ -33,8 +33,13 @@ const config = {
   google: {
     clientId: process.env.APP_GOOGLE_CLIENT_ID,
     clientSecret: process.env.APP_GOOGLE_CLIENT_SECRET,
-    redirectUri: process.env.APP_GOOGLE_REDIRECT_URI,
-    calendarWebhookUri: process.env.APP_GOOGLE_CALENDAR_WEBHOOK_URI,
+    redirectUri:
+      process.env.APP_GOOGLE_REDIRECT_URI || "/google/oauth/callback",
+    calendarWebhookUri:
+      process.env.APP_GOOGLE_CALENDAR_WEBHOOK_URI || "/google/calendar/events",
+  },
+  graphql: {
+    path: process.env.APP_GRAPHQL_PATH || "graphql",
   },
 };
 
