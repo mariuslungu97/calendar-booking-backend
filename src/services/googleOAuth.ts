@@ -4,6 +4,8 @@ import { Credentials } from "google-auth-library";
 import logger from "../loaders/logger";
 import config from "../config";
 
+import { IGoogleOAuthApi } from "../types";
+
 const { clientId, clientSecret, redirectUri } = config.google;
 
 const appOAuthClient = new google.auth.OAuth2(
@@ -14,7 +16,7 @@ const appOAuthClient = new google.auth.OAuth2(
 
 const scopes = ["https://www.googleapis.com/auth/calendar.events"];
 
-const generateAuthUrl = () =>
+const generateOAuthUrl = () =>
   appOAuthClient.generateAuthUrl({
     access_type: "offline",
     scope: scopes,
@@ -35,14 +37,36 @@ const getTokens = async (
 const getOAuthClient = () =>
   new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 
-const getClientWithTokens = async (authorizationCode: string) => {
-  const tokens = await getTokens(authorizationCode);
-  if (!tokens) return;
+const getOAuthClientWithTokens = async (authorizationCode: string) => {
+  try {
+    const tokens = await getTokens(authorizationCode);
+    if (!tokens) return null;
 
-  const authClient = getOAuthClient();
-  authClient.setCredentials(tokens);
+    const authClient = getOAuthClient();
+    authClient.setCredentials(tokens);
 
-  return authClient;
+    return authClient;
+  } catch (err) {
+    logger.info(err);
+    return null;
+  }
 };
 
-export { getOAuthClient, getClientWithTokens, generateAuthUrl };
+const revokeOAuthTokens = async (accessToken: string) => {
+  try {
+    await getOAuthClient().revokeToken(accessToken);
+    return;
+  } catch (err) {
+    logger.info("Failed revoking Google OAuth tokens: ", err);
+  }
+};
+
+const oAuthApi: IGoogleOAuthApi = {
+  generateOAuthUrl,
+  getOAuthClient,
+  getTokens,
+  getOAuthClientWithTokens,
+  revokeOAuthTokens,
+};
+
+export default oAuthApi;
