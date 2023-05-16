@@ -4,16 +4,14 @@ import logger from "../loaders/logger";
 import knexClient from "../loaders/knex";
 import calendarApi from "../services/googleCalendar";
 import syncApi from "../services/calendarSync";
-import { getOAuthClient } from "../services/googleOAuth";
-import { syncCalendarEvents } from "../services/calendarSync";
+import googleAuthStore from "../services/googleAuthClients";
 
-import { TSyncQueueData, Connection, IWorker } from "../types";
+import { syncCalendarEvents } from "../utils/sync";
 
-type TSyncErrorReason =
-  | "CONNECTION_NOT_FOUND"
-  | "SYNC_TOKEN_NOT_FOUND"
-  | "INVALID_SYNC_TOKEN";
-export class IncrementalSyncProcessorError extends Error {
+import { TSyncJob, Connection } from "../types";
+
+type TSyncErrorReason = "SYNC_TOKEN_NOT_FOUND" | "INVALID_SYNC_TOKEN";
+export class IncrementalSyncError extends Error {
   public reason: TSyncErrorReason;
   constructor(message: string, reason: TSyncErrorReason) {
     super(message);
@@ -21,7 +19,7 @@ export class IncrementalSyncProcessorError extends Error {
   }
 }
 
-const processor = async (job: Job<TSyncQueueData>): Promise<any> => {
+const processor = async (job: Job<TSyncJob>): Promise<any> => {
   const { userId } = job.data;
 
   try {
@@ -32,31 +30,23 @@ const processor = async (job: Job<TSyncQueueData>): Promise<any> => {
         .where({ user_id: userId, provider: "GOOGLE" })
     )[0];
 
-    if (!googleConnection)
-      throw new IncrementalSyncProcessorError(
-        "Couldn't find an associated connection for user with provided id!",
-        "CONNECTION_NOT_FOUND"
-      );
-    else if (!googleConnection.sync_token)
-      throw new IncrementalSyncProcessorError(
+    if (!googleConnection.sync_token)
+      throw new IncrementalSyncError(
         "Couldn't find a sync token for user with provided id!",
         "SYNC_TOKEN_NOT_FOUND"
       );
 
-    // create auth client
-    const userAuthClient = getOAuthClient();
-    userAuthClient.setCredentials({
-      access_token: googleConnection.access_token,
-      refresh_token: googleConnection.refresh_token,
-    });
+    // get auth client
+    const authClient = googleAuthStore.getClient(userId);
+    if (!authClient) throw new Error("Couldn't find the auth client in store!");
 
-    const { getEvents } = calendarApi(userAuthClient);
+    const { getEvents } = calendarApi(authClient);
     const { data, syncToken, isSyncTokenInvalid } = await getEvents({
       syncToken: googleConnection.sync_token,
     });
 
     if (isSyncTokenInvalid)
-      throw new IncrementalSyncProcessorError(
+      throw new IncrementalSyncError(
         "The associated sync token has become invalid!",
         "INVALID_SYNC_TOKEN"
       );
@@ -74,7 +64,7 @@ const processor = async (job: Job<TSyncQueueData>): Promise<any> => {
   }
 };
 
-const incrementalSync = new Worker<TSyncQueueData>(
+const incrementalSyncWorker = new Worker<TSyncJob>(
   "calendarIncrementalSync",
   processor,
   {
@@ -83,26 +73,22 @@ const incrementalSync = new Worker<TSyncQueueData>(
   }
 );
 
-incrementalSync.on("failed", async (job, error) => {
+incrementalSyncWorker.on("failed", async (job, error) => {
   if (!job) return;
-  const { userId } = job.data;
-  if (error instanceof IncrementalSyncProcessorError) {
-    if (error.reason === "CONNECTION_NOT_FOUND") {
-      await syncApi.stopCalendarSync(userId);
-    } else if (error.reason === "SYNC_TOKEN_NOT_FOUND") {
-      await syncApi.restartCalendarSync(userId);
-    } else if (error.reason === "INVALID_SYNC_TOKEN") {
-      await syncApi.restartCalendarSync(userId);
+  if (error instanceof IncrementalSyncError) {
+    const { userId } = job.data;
+    const { reason } = error;
+
+    logger.info(
+      `Encountered calendar sync error of type ${reason} whilst performing process!`
+    );
+
+    if (reason === "SYNC_TOKEN_NOT_FOUND") {
+      syncApi.addOneTimeSyncJob("fullSync", userId, { userId });
+    } else if (reason === "INVALID_SYNC_TOKEN") {
+      syncApi.addOneTimeSyncJob("fullSync", userId, { userId });
     }
   }
 });
 
-const workerApi: IWorker = {
-  start: async () => await incrementalSync.run(),
-  stop: async () => await incrementalSync.close(),
-  updateCFactor: async (cFactor: number) => {
-    incrementalSync.concurrency = cFactor;
-  },
-};
-
-export default workerApi;
+export default incrementalSyncWorker;

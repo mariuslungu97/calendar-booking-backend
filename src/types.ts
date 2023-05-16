@@ -1,4 +1,8 @@
 import { calendar_v3 } from "googleapis";
+import { Credentials, OAuth2Client } from "google-auth-library";
+import { JobsOptions } from "bullmq";
+
+export type TUserSessionData = { id: string; email: string };
 
 /**
  * ==========================
@@ -30,12 +34,38 @@ export interface CalendarEvent {
 }
 
 export type CalendarEventCreateInput = Omit<CalendarEvent, "id">;
+export type ConnectionCreateInput = Omit<Connection, "id">;
 
 /**
  * ==========================
  * ======= SERVICES =========
  * ==========================
  */
+
+/**
+ * Google OAuth API
+ */
+
+export interface IGoogleOAuthApi {
+  generateOAuthUrl: () => string;
+  getTokens: (authorizationCode: string) => Promise<Credentials | null>;
+  getOAuthClient: () => OAuth2Client;
+  getOAuthClientWithTokens: (
+    authorizationCode: string
+  ) => Promise<OAuth2Client | null>;
+  revokeOAuthTokens: (accessToken: string) => Promise<void>;
+}
+
+/**
+ * Gooogle OAuth Clients Store
+ */
+
+export interface IGoogleAuthClientsStore {
+  addClient: (userId: string, authClient: OAuth2Client) => void;
+  removeClient: (userId: string) => void;
+  getClient: (userId: string) => OAuth2Client | null;
+  hydrateStore: () => Promise<void>;
+}
 
 /**
  * Google Calendar API
@@ -75,6 +105,11 @@ export type TGetEventsResponse = {
 export type TWatchCalendarParams = {
   channelId: string;
   address: string;
+  expiration: string;
+};
+
+export type TStopWatchCalendarParams = {
+  channelId: string;
 };
 
 export interface IGoogleCalendarApi {
@@ -85,28 +120,49 @@ export interface IGoogleCalendarApi {
   ) => Promise<calendar_v3.Schema$Event | null>;
   deleteEvent: (id: string) => Promise<boolean>;
   watchCalendar: (params: TWatchCalendarParams) => Promise<boolean>;
+  stopWatchCalendar: (params: TStopWatchCalendarParams) => Promise<boolean>;
 }
 
 /**
  * Google Calendar Sync Queues
  */
 
-export interface ICalendarSync {
-  startCalendarSync: (userId: string) => Promise<void>;
-  stopCalendarSync: (userId: string) => Promise<void>;
-  restartCalendarSync: (userId: string) => Promise<void>;
+export type TSyncOneJobType = "fullSync" | "incrementalSync" | "channelRefresh";
+
+export interface ICalendarSyncApi {
+  startSyncRoutine: (userId: string) => Promise<void>;
+  stopSyncRoutine: (userId: string) => Promise<void>;
+  addOneTimeSyncJob: (
+    type: TSyncOneJobType,
+    jobId: string,
+    jobData: any,
+    jobOptions?: JobsOptions
+  ) => Promise<void>;
 }
 
-export type TSyncQueueData = {
+export type TSyncJob = {
   userId: string;
 };
 
 /**
- * Queue Workers
+ * ==========================
+ * ========= API ============
+ * ==========================
  */
 
-export interface IWorker {
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  updateCFactor: (cFactor: number) => Promise<void>;
+export interface IRestApiResponse<TData, TError> {
+  code?: number;
+  message?: string;
+  data?: TData;
+  error?: TError;
+}
+
+type TErrorReason = "UNAUTHORISED" | "UNAUTHENTICATED";
+export class RestApiError extends Error {
+  public reason: TErrorReason;
+
+  constructor(message: string, reason: TErrorReason) {
+    super(message);
+    this.reason = reason;
+  }
 }
