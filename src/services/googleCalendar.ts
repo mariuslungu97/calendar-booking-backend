@@ -11,6 +11,7 @@ import {
   TGetEventsResponse,
   IGoogleCalendarApi,
   TWatchCalendarParams,
+  TStopWatchCalendarParams,
 } from "../types";
 
 const calendar = google.calendar("v3");
@@ -139,14 +140,15 @@ const calendarApi = (
   const watchCalendar = async (
     params: TWatchCalendarParams
   ): Promise<boolean> => {
-    const { channelId, address } = params;
+    const { channelId, address, expiration } = params;
     try {
       const response = await calendar.events.watch({
         calendarId,
         requestBody: {
           id: channelId,
-          type: "webhook",
+          type: "web_hook",
           address,
+          expiration,
         },
       });
       if (response.data && response.data.id) return true;
@@ -157,12 +159,37 @@ const calendarApi = (
     }
   };
 
+  const stopWatchCalendar = async (
+    params: TStopWatchCalendarParams
+  ): Promise<boolean> => {
+    const { channelId } = params;
+    try {
+      const primaryCalendarResponse = await calendar.calendars.get({
+        calendarId: "primary",
+      });
+      if (!primaryCalendarResponse.data || !primaryCalendarResponse.data.id)
+        return false;
+
+      await calendar.channels.stop({
+        requestBody: {
+          id: channelId,
+          resourceId: primaryCalendarResponse.data.id,
+        },
+      });
+      return true;
+    } catch (err) {
+      logger.info("Failed to stop watching resource: ", err);
+      return false;
+    }
+  };
+
   return {
     createEvent,
     deleteEvent,
     getEvent,
     getEvents,
     watchCalendar,
+    stopWatchCalendar,
   };
 };
 
