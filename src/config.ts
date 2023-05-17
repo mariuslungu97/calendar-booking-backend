@@ -38,6 +38,18 @@ const config = {
     calendarWebhookUri:
       process.env.APP_GOOGLE_CALENDAR_WEBHOOK_URI || "/google/calendar/events",
   },
+  stripe: {
+    apiKey: mandatoryEnv(process.env.STRIPE_API_KEY, "STRIPE_API_KEY"),
+    accountLinkRefreshUri:
+      process.env.STRIPE_ACCOUNT_LINKS_REFRESH_URI ||
+      "/stripe/accounts/refresh",
+    accountLinkReturnUri:
+      process.env.STRIPE_ACCOUNT_LINKS_RETURN_URI || "/stripe/accounts/return",
+    paymentSuccessUri:
+      process.env.STRIPE_PAYMENT_SUCCESS_URI || "/stripe/payments/success",
+    paymentCancelUri:
+      process.env.STRIPE_PAYMENT_CANCEL_URI || "/stripe/payments/cancel",
+  },
   graphql: {
     path: process.env.APP_GRAPHQL_PATH || "graphql",
   },

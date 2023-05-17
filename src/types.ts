@@ -1,6 +1,7 @@
 import { calendar_v3 } from "googleapis";
 import { Credentials, OAuth2Client } from "google-auth-library";
 import { JobsOptions } from "bullmq";
+import Stripe from "stripe";
 
 export type TUserSessionData = { id: string; email: string };
 
@@ -143,6 +144,51 @@ export interface ICalendarSyncApi {
 export type TSyncJob = {
   userId: string;
 };
+
+/**
+ * Stripe Api
+ */
+
+export type TStripeCreateAccountParams = {
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+export type TStripeCreateAccountLinkParams = {
+  accountId: string;
+};
+
+export type TStripeCreateProductWithPriceParams = {
+  productName: string;
+  unitPrice: number;
+};
+
+export type TStripeCreatePaymentSessionParams = {
+  accountId: string;
+  priceId: string;
+  applicationFee: number;
+};
+
+export type TStripeDeleteProductWithPriceParams = {
+  priceId: string;
+  productId: string;
+};
+
+export interface IStripeApi {
+  createAccount: (
+    params: TStripeCreateAccountParams
+  ) => Promise<Stripe.Account | null>;
+  createAccountLink: (
+    params: TStripeCreateAccountLinkParams
+  ) => Promise<Stripe.AccountLink | null>;
+  createProductWithPrice: (
+    params: TStripeCreateProductWithPriceParams
+  ) => Promise<Stripe.Price | null>;
+  createPaymentSession: (
+    params: TStripeCreatePaymentSessionParams
+  ) => Promise<Stripe.Checkout.Session | null>;
+}
 
 /**
  * ==========================
