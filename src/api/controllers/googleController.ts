@@ -16,26 +16,46 @@ import {
 type TOAuthHandlerParams = {
   error?: string;
   code?: string;
+  state?: string;
 };
 
-const oAuthHandler = (_: Request, res: Response) => {
-  return res.status(303).redirect(oAuthApi.generateOAuthUrl());
+const oAuthHandler = (req: Request, res: Response) => {
+  const userSession = req.session.user as TUserSessionData;
+  const authState = { userId: userSession };
+  const encodedState = Buffer.from(JSON.stringify(authState)).toString(
+    "base64url"
+  );
+  let authUrl = oAuthApi.generateOAuthUrl();
+  authUrl += `state=${encodedState}`;
+  return res.status(303).redirect(authUrl);
 };
 
 const oAuthCallbackHandler = async (
   req: Request<TOAuthHandlerParams>,
   res: Response<IRestApiResponse<any, any>>
 ) => {
-  const { error: errorInfo, code } = req.params;
+  const { error: errorInfo, code, state } = req.params;
 
-  if (errorInfo)
-    return res.status(401).json({
-      code: 401,
-      message: "You have failed to connect to Google, please try again!",
-      error: { info: errorInfo },
+  if (errorInfo || !state) {
+    if (!state)
+      logger.error(
+        "No state to identify user available in Google's oauth callback handler!"
+      );
+    const statusCode = errorInfo ? 401 : 500;
+    const jsonMessage = errorInfo
+      ? "You have failed to connect to Google, please try again!"
+      : "An unexpected error has occured, please try again later!";
+    return res.status(statusCode).json({
+      code: statusCode,
+      message: jsonMessage,
+      ...(errorInfo && { info: errorInfo }),
     });
+  }
 
-  const userSession = req.session.user as TUserSessionData;
+  const authState = JSON.parse(
+    Buffer.from(state, "base64url").toString("ascii")
+  );
+  const userId = authState.userId;
   const authCode = code as string;
   try {
     const authClient = await oAuthApi.getOAuthClientWithTokens(authCode);
@@ -47,7 +67,7 @@ const oAuthCallbackHandler = async (
 
     // create connection
     await knexClient<ConnectionCreateInput>("connections").insert({
-      user_id: userSession.id,
+      user_id: userId,
       provider: "GOOGLE",
       access_token: authClient.credentials.access_token as string,
       refresh_token: authClient.credentials.refresh_token as string,
@@ -61,10 +81,10 @@ const oAuthCallbackHandler = async (
     });
 
     // start google tokens refresh service
-    googleAuthStore.addClient(userSession.id, authClient);
+    googleAuthStore.addClient(userId, authClient);
 
     // start calendar sync routine
-    syncApi.startSyncRoutine(userSession.id);
+    syncApi.startSyncRoutine(userId);
   } catch (err) {
     logger.info("An API error has occured!", err);
     return res.status(500).json({
