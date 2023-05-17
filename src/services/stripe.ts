@@ -6,6 +6,7 @@ import config from "../config";
 import {
   IStripeApi,
   TStripeCreateAccountParams,
+  TStripeRetrieveAccountParams,
   TStripeCreateAccountLinkParams,
   TStripeCreateProductWithPriceParams,
   TStripeCreatePaymentSessionParams,
@@ -28,17 +29,42 @@ const createAccount = async (
   try {
     const { firstName, lastName, email } = params;
     const newAccount: Stripe.Account = await stripe.accounts.create({
+      type: "express",
       email,
       individual: {
         email,
         first_name: firstName,
         last_name: lastName,
       },
+      capabilities: {
+        card_payments: {
+          requested: true,
+        },
+        transfers: {
+          requested: true,
+        },
+      },
     });
     return newAccount;
   } catch (err) {
     logger.info(
       "An error occured whilst trying to create a stripe account!",
+      err
+    );
+    return null;
+  }
+};
+
+const retrieveAccount = async (
+  params: TStripeRetrieveAccountParams
+): Promise<Stripe.Account | null> => {
+  try {
+    const { accountId } = params;
+    const account = await stripe.accounts.retrieve(accountId);
+    return account;
+  } catch (err) {
+    logger.info(
+      "An error occured whilst trying retrieve a stripe account!",
       err
     );
     return null;
@@ -70,14 +96,17 @@ const createProductWithPrice = async (
   params: TStripeCreateProductWithPriceParams
 ): Promise<Stripe.Price | null> => {
   try {
-    const { productName, unitPrice } = params;
-    const productAndPrice = await stripe.prices.create({
-      currency: "USD",
-      unit_amount: unitPrice,
-      product_data: {
-        name: productName,
+    const { accountId, productName, unitPrice } = params;
+    const productAndPrice = await stripe.prices.create(
+      {
+        currency: "USD",
+        unit_amount: unitPrice,
+        product_data: {
+          name: productName,
+        },
       },
-    });
+      { stripeAccount: accountId }
+    );
     return productAndPrice;
   } catch (err) {
     logger.info(
@@ -92,7 +121,8 @@ const createPaymentSession = async (
   params: TStripeCreatePaymentSessionParams
 ): Promise<Stripe.Checkout.Session | null> => {
   try {
-    const { accountId, priceId, applicationFee } = params;
+    const { accountId, priceId, eventId, shopperEmail, applicationFee } =
+      params;
     const paymentSession = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [
@@ -106,7 +136,9 @@ const createPaymentSession = async (
         transfer_data: {
           destination: accountId,
         },
+        receipt_email: shopperEmail,
       },
+      client_reference_id: eventId,
       success_url: `${uri}${paymentSuccessUri}`,
       cancel_url: `${uri}${paymentCancelUri}`,
     });
@@ -119,6 +151,7 @@ const createPaymentSession = async (
 
 const stripeApi: IStripeApi = {
   createAccount,
+  retrieveAccount,
   createAccountLink,
   createProductWithPrice,
   createPaymentSession,

@@ -155,11 +155,16 @@ export type TStripeCreateAccountParams = {
   email: string;
 };
 
+export type TStripeRetrieveAccountParams = {
+  accountId: string;
+};
+
 export type TStripeCreateAccountLinkParams = {
   accountId: string;
 };
 
 export type TStripeCreateProductWithPriceParams = {
+  accountId: string;
   productName: string;
   unitPrice: number;
 };
@@ -167,7 +172,9 @@ export type TStripeCreateProductWithPriceParams = {
 export type TStripeCreatePaymentSessionParams = {
   accountId: string;
   priceId: string;
+  eventId: string;
   applicationFee: number;
+  shopperEmail: string;
 };
 
 export type TStripeDeleteProductWithPriceParams = {
@@ -178,6 +185,9 @@ export type TStripeDeleteProductWithPriceParams = {
 export interface IStripeApi {
   createAccount: (
     params: TStripeCreateAccountParams
+  ) => Promise<Stripe.Account | null>;
+  retrieveAccount: (
+    params: TStripeRetrieveAccountParams
   ) => Promise<Stripe.Account | null>;
   createAccountLink: (
     params: TStripeCreateAccountLinkParams
