@@ -11,31 +11,125 @@ export type TUserSessionData = { id: string; email: string };
  * ==========================
  */
 
-type TProviderType = "GOOGLE" | "STRIPE";
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  is_email_verified: boolean;
+  calendar_sync_token?: string;
+  stripe_account_id?: string;
+  is_deleted: boolean;
+  deleted_at?: string;
+  created_at: string;
+}
 
-export interface Connection {
+export interface Schedule {
   id: string;
   user_id: string;
-  provider: TProviderType;
+  timezone: string;
+}
+
+export interface SchedulePeriod {
+  id: string;
+  schedule_id: string;
+  day: number;
+  start_time: string;
+  end_time: string;
+}
+
+export type TOAuthConnectionProviderType = "GOOGLE";
+export interface OAuthConnection {
+  user_id: string;
+  provider: TOAuthConnectionProviderType;
   access_token: string;
   refresh_token?: string;
-  sync_token?: string;
   created_at: string;
-  updated_at: string;
+}
+
+export type TEventTypeLocationType = "G_MEET" | "ADDRESS" | "HOME";
+export interface EventType {
+  id: string;
+  user_id?: string;
+  schedule_id: string;
+  link: string;
+  name: string;
+  duration: number;
+  is_active: boolean;
+  collects_payments: boolean;
+  location: TEventTypeLocationType;
+  description?: string;
+  payment_fee?: number;
+  location_phone_number?: string;
+  location_address?: string;
+  stripe_product_id?: string;
+  stripe_price_id?: string;
+  created_at: string;
+}
+
+export type TEventTypeQuestionType = "TEXT" | "RADIO" | "CHECKBOX";
+export interface EventTypeQuestion {
+  id: string;
+  event_type_id: string;
+  type: TEventTypeQuestionType;
+  label: string;
+  order: number;
+  is_optional: boolean;
+}
+
+export interface EventTypeQuestionPossibleAnswer {
+  id: string;
+  question_id: string;
+  value: string;
 }
 
 export interface CalendarEvent {
   id: string;
   google_id: string;
-  user_id: string;
+  event_id?: string;
   start_date_time: string;
   end_date_time: string;
   google_link: string;
-  google_meets_link?: string;
 }
 
-export type CalendarEventCreateInput = Omit<CalendarEvent, "id">;
-export type ConnectionCreateInput = Omit<Connection, "id">;
+export type TPaymentStatusType = "WAITING" | "SUCCESS" | "FAIL";
+export interface Payment {
+  id: string;
+  user_id?: string;
+  status: TPaymentStatusType;
+  total_fee: number;
+  application_fee: number;
+  processor_payload: object;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TEventStatusType =
+  | "PENDING_PAYMENT"
+  | "ACTIVE"
+  | "CANCELLED"
+  | "FAILED_PAYMENT";
+
+export interface Event {
+  id: string;
+  user_id?: string;
+  event_type_id: string;
+  payment_id: string;
+  status: TEventStatusType;
+  user_email: string;
+  invitee_email: string;
+  invitee_full_name: string;
+  google_meets_link?: string;
+  cancelled_at?: string;
+  created_at: string;
+}
+
+export type TCreateInput<DbType> = Omit<
+  DbType,
+  "id" | "created_at" | "updated_at"
+>;
 
 /**
  * ==========================

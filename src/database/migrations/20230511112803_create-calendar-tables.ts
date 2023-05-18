@@ -17,43 +17,44 @@ export async function up(knex: Knex): Promise<void> {
                 .string("username")
                 .notNullable()
                 .unique()
-                .checkLength("<=", 100);
-              table.string("first_name").notNullable();
-              table.string("last_name").notNullable();
+                .checkLength("<=", 50);
+
               table.string("email").notNullable().unique();
               table.string("password").notNullable();
+
+              table.string("first_name").notNullable();
+              table.string("last_name").notNullable();
+
               table.boolean("is_email_verified").notNullable().defaultTo(false);
+
               table.boolean("is_deleted").notNullable().defaultTo(false);
-              table.timestamps(true, true); // adds created_at and updated_at timestamps with default of now()
               table.timestamp("deleted_at");
+
+              table.string("calendar_sync_token");
+              table.string("stripe_account_id");
+
+              table.timestamp("created_at").defaultTo(knex.fn.now());
             });
           }
           return;
         })
         .then(() => {
-          return knex.schema.hasTable("connections").then((exists) => {
+          return knex.schema.hasTable("oauth_connections").then((exists) => {
             if (!exists) {
-              return knex.schema.createTable("connections", (table) => {
-                table
-                  .uuid("id")
-                  .primary()
-                  .defaultTo(knex.raw("uuid_generate_v4()"));
-
+              return knex.schema.createTable("oauth_connections", (table) => {
+                // composite primary key - user_id & provider
                 table.uuid("user_id");
-                table
-                  .foreign("user_id")
-                  .references("id")
-                  .inTable("users")
-                  .onDelete("CASCADE");
-
-                table.enu("provider", ["GOOGLE", "STRIPE"], {
-                  useNative: true,
+                table.enu("provider", ["GOOGLE"], {
                   enumName: "provider_type",
+                  useNative: true,
                 });
+
                 table.string("access_token").notNullable();
                 table.string("refresh_token");
-                table.string("sync_token");
-                table.timestamps(true, true); // created_at and updated_at
+
+                table.timestamp("created_at").defaultTo(knex.fn.now());
+
+                table.primary(["user_id", "provider"]);
               });
             }
             return;
@@ -76,7 +77,6 @@ export async function up(knex: Knex): Promise<void> {
                   .onDelete("CASCADE");
 
                 table.string("timezone").notNullable();
-                table.timestamps(true, true);
               });
             }
             return;
@@ -101,7 +101,6 @@ export async function up(knex: Knex): Promise<void> {
                 table.smallint("day").notNullable().checkBetween([0, 6]);
                 table.time("start_time").notNullable();
                 table.time("end_time").notNullable();
-                table.timestamps(true);
               });
             }
             return;
@@ -130,21 +129,28 @@ export async function up(knex: Knex): Promise<void> {
                   .inTable("schedules")
                   .onDelete("SET NULL");
 
+                table.string("link").notNullable().checkLength("<=", 50);
                 table.string("name").notNullable();
                 table.text("description");
-                table.string("link").notNullable().checkLength("<=", 100);
-                table.integer("duration").notNullable();
-                table.enu("location", ["G_MEET", "ADDRESS", "PHONE"], {
-                  useNative: true,
-                  enumName: "location_type",
-                });
-                table.date("expires_at");
-                table.boolean("is_expired").notNullable().defaultTo(false);
+
+                table.integer("duration").unsigned().notNullable();
+
+                table.boolean("is_active").notNullable().defaultTo(true);
+
                 table.boolean("collects_payments").notNullable();
                 table.specificType("payment_fee", "money");
-                table.string("user_phone_number");
-                table.string("user_address");
-                table.timestamps(true, true);
+
+                table.enu("location", ["G_MEET", "ADDRESS", "PHONE"], {
+                  enumName: "location_type",
+                  useNative: true,
+                });
+                table.string("location_phone_number");
+                table.string("location_address");
+
+                table.string("stripe_price_id");
+                table.string("stripe_product_id");
+
+                table.timestamp("created_at").defaultTo(knex.fn.now());
               });
             }
             return;
@@ -166,12 +172,13 @@ export async function up(knex: Knex): Promise<void> {
                     .foreign("event_type_id")
                     .references("id")
                     .inTable("event_types")
-                    .onDelete("RESTRICT");
+                    .onDelete("CASCADE");
 
                   table.enu("type", ["TEXT", "RADIO", "CHECKBOX"], {
                     useNative: true,
                     enumName: "question_type",
                   });
+
                   table.string("label").notNullable();
                   table.smallint("order").notNullable();
                   table.boolean("is_optional").notNullable();
@@ -216,6 +223,7 @@ export async function up(knex: Knex): Promise<void> {
                   .uuid("id")
                   .primary()
                   .defaultTo(knex.raw("uuid_generate_v4()"));
+
                 table.string("google_id").notNullable();
 
                 table.uuid("user_id");
@@ -225,10 +233,16 @@ export async function up(knex: Knex): Promise<void> {
                   .inTable("users")
                   .onDelete("SET NULL");
 
+                table.uuid("event_id").nullable();
+                table
+                  .foreign("event_id")
+                  .references("id")
+                  .inTable("events")
+                  .onDelete("CASCADE");
+
                 table.datetime("start_date_time").notNullable();
                 table.datetime("end_date_time").notNullable();
                 table.string("google_link").notNullable();
-                table.string("google_meets_link");
               });
             }
           });
@@ -287,13 +301,6 @@ export async function up(knex: Knex): Promise<void> {
                   .inTable("event_types")
                   .onDelete("RESTRICT");
 
-                table.uuid("calendar_event_id").nullable();
-                table
-                  .foreign("calendar_event_id")
-                  .references("id")
-                  .inTable("calendar_events")
-                  .onDelete("SET NULL");
-
                 table.uuid("payment_id").nullable();
                 table
                   .foreign("payment_id")
@@ -301,16 +308,19 @@ export async function up(knex: Knex): Promise<void> {
                   .inTable("payments")
                   .onDelete("RESTRICT");
 
+                table.enu(
+                  "status",
+                  ["PENDING_PAYMENT", "ACTIVE", "CANCELLED", "FAILED_PAYMENT"],
+                  { enumName: "event_status_type", useNative: true }
+                );
+
                 table.string("user_email").notNullable();
                 table.string("invitee_email").notNullable();
                 table.string("invitee_full_name").notNullable();
-                table.boolean("is_cancelled").notNullable().defaultTo(false);
-                table.datetime("start_date_time").notNullable();
-                table.datetime("end_date_time").notNullable();
-                table
-                  .timestamp("created_at")
-                  .notNullable()
-                  .defaultTo(knex.fn.now());
+
+                table.string("google_meets_link");
+
+                table.timestamp("created_at").defaultTo(knex.fn.now());
                 table.timestamp("cancelled_at");
               });
             }
@@ -321,25 +331,11 @@ export async function up(knex: Knex): Promise<void> {
           return knex.schema.hasTable("event_answers").then((exists) => {
             if (!exists) {
               return knex.schema.createTable("event_answers", (table) => {
-                table
-                  .uuid("id")
-                  .primary()
-                  .defaultTo(knex.raw("uuid_generate_v4()"));
-
                 table.uuid("event_id");
-                table
-                  .foreign("event_id")
-                  .references("id")
-                  .inTable("events")
-                  .onDelete("CASCADE");
-
                 table.uuid("question_id");
-                table
-                  .foreign("question_id")
-                  .references("id")
-                  .inTable("event_type_questions")
-                  .onDelete("RESTRICT");
-                table.text("value");
+                table.text("value").notNullable();
+
+                table.primary(["event_id", "question_id"]);
               });
             }
             return;
@@ -354,11 +350,11 @@ export async function down(knex: Knex): Promise<void> {
     "location_type",
     "question_type",
     "payment_status_type",
+    "event_status_type",
   ];
   const tables = [
     "users",
-    "connections",
-    "sessions",
+    "oauth_connections",
     "schedules",
     "schedule_periods",
     "event_types",
