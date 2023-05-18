@@ -216,6 +216,19 @@ export async function up(knex: Knex): Promise<void> {
             });
         })
         .then(() => {
+          return knex.schema.hasTable("event_schedules").then((exists) => {
+            if (!exists) {
+              return knex.schema.createTable("event_schedules", (table) => {
+                table.uuid("id").primary();
+                table.timestamp("start_date_time").notNullable();
+                table.timestamp("end_date_time").notNullable();
+                table.integer("duration").unsigned().notNullable();
+              });
+            }
+            return;
+          });
+        })
+        .then(() => {
           return knex.schema.hasTable("calendar_events").then((exists) => {
             if (!exists) {
               return knex.schema.createTable("calendar_events", (table) => {
@@ -240,9 +253,15 @@ export async function up(knex: Knex): Promise<void> {
                   .inTable("events")
                   .onDelete("CASCADE");
 
-                table.datetime("start_date_time").notNullable();
-                table.datetime("end_date_time").notNullable();
+                table.uuid("event_schedule_id");
+                table
+                  .foreign("event_schedule_id")
+                  .references("id")
+                  .inTable("event_schedule")
+                  .onDelete("RESTRICT");
+
                 table.string("google_link").notNullable();
+                table.string("google_meets_link");
               });
             }
           });
@@ -262,6 +281,9 @@ export async function up(knex: Knex): Promise<void> {
                   .references("id")
                   .inTable("users")
                   .onDelete("SET NULL");
+
+                table.string("stripe_session_id").notNullable();
+                table.string("stripe_payment_intent_id").notNullable();
 
                 table
                   .enu("status", ["WAITING", "SUCCESS", "FAIL"], {
@@ -308,6 +330,13 @@ export async function up(knex: Knex): Promise<void> {
                   .inTable("payments")
                   .onDelete("RESTRICT");
 
+                table.uuid("event_schedule_id");
+                table
+                  .foreign("event_schedule_id")
+                  .references("id")
+                  .inTable("event_schedule")
+                  .onDelete("RESTRICT");
+
                 table.enu(
                   "status",
                   ["PENDING_PAYMENT", "ACTIVE", "CANCELLED", "FAILED_PAYMENT"],
@@ -317,8 +346,6 @@ export async function up(knex: Knex): Promise<void> {
                 table.string("user_email").notNullable();
                 table.string("invitee_email").notNullable();
                 table.string("invitee_full_name").notNullable();
-
-                table.string("google_meets_link");
 
                 table.timestamp("created_at").defaultTo(knex.fn.now());
                 table.timestamp("cancelled_at");
@@ -363,6 +390,7 @@ export async function down(knex: Knex): Promise<void> {
     "events",
     "event_answers",
     "calendar_events",
+    "event_schedules",
     "payments",
   ];
 

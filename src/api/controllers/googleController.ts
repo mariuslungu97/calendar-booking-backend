@@ -7,11 +7,7 @@ import syncApi from "../../services/calendarSync";
 import oAuthApi from "../../services/googleOAuth";
 import googleAuthStore from "../../services/googleAuthClients";
 
-import {
-  IRestApiResponse,
-  TUserSessionData,
-  ConnectionCreateInput,
-} from "../../types";
+import { IRestApiResponse, TUserSessionData } from "../../types";
 
 type TOAuthHandlerParams = {
   error?: string;
@@ -65,13 +61,14 @@ const oAuthCallbackHandler = async (
         message: "An unexpected error has occured, please try again later!",
       });
 
+    const { access_token, refresh_token } = authClient.credentials;
+
     // create connection
-    await knexClient<ConnectionCreateInput>("connections").insert({
+    await knexClient("oauth_connections").insert({
+      refresh_token,
       user_id: userId,
       provider: "GOOGLE",
-      access_token: authClient.credentials.access_token as string,
-      refresh_token: authClient.credentials.refresh_token as string,
-      sync_token: undefined,
+      access_token: access_token as string,
     });
 
     res.status(200).json({

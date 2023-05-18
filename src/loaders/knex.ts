@@ -12,4 +12,5 @@ export default knex({
     password,
     database,
   },
+  useNullAsDefault: true,
 });

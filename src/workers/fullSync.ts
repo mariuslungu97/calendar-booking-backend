@@ -32,9 +32,9 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
     await syncCalendarEvents(data, userId);
 
     // update sync token
-    await knexClient("connections")
-      .update({ sync_token: syncToken })
-      .where({ user_id: userId });
+    await knexClient("users")
+      .update({ calendar_sync_token: syncToken })
+      .where({ id: userId });
 
     return;
   } catch (err) {

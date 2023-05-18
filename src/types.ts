@@ -19,18 +19,24 @@ export interface User {
   first_name: string;
   last_name: string;
   is_email_verified: boolean;
-  calendar_sync_token?: string;
-  stripe_account_id?: string;
+  calendar_sync_token?: string | null;
+  stripe_account_id?: string | null;
   is_deleted: boolean;
-  deleted_at?: string;
+  deleted_at?: string | null;
   created_at: string;
 }
+export type TUserCreateInput = Omit<User, "id" | "created_at">;
+export type TUserUpdateParams = Partial<
+  Omit<User, "id" | "email" | "created_at">
+>;
 
 export interface Schedule {
   id: string;
   user_id: string;
   timezone: string;
 }
+export type TScheduleCreateInput = Omit<Schedule, "id">;
+export type TScheduleUpdateParams = Partial<Omit<Schedule, "id" | "user_id">>;
 
 export interface SchedulePeriod {
   id: string;
@@ -39,20 +45,28 @@ export interface SchedulePeriod {
   start_time: string;
   end_time: string;
 }
+export type TSchedulePeriodCreateInput = SchedulePeriod;
+export type TSchedulePeriodUpdateParams = Partial<
+  Omit<SchedulePeriod, "id" | "schedule_id">
+>;
 
 export type TOAuthConnectionProviderType = "GOOGLE";
 export interface OAuthConnection {
   user_id: string;
   provider: TOAuthConnectionProviderType;
   access_token: string;
-  refresh_token?: string;
+  refresh_token?: string | null;
   created_at: string;
 }
+export type TOAuthConnectionCreateInput = Omit<OAuthConnection, "created_at">;
+export type TOAuthConnectionUpdateParams = Partial<
+  Omit<OAuthConnection, "user_id" | "provider" | "created_at">
+>;
 
 export type TEventTypeLocationType = "G_MEET" | "ADDRESS" | "HOME";
 export interface EventType {
   id: string;
-  user_id?: string;
+  user_id?: string | null;
   schedule_id: string;
   link: string;
   name: string;
@@ -60,14 +74,18 @@ export interface EventType {
   is_active: boolean;
   collects_payments: boolean;
   location: TEventTypeLocationType;
-  description?: string;
-  payment_fee?: number;
-  location_phone_number?: string;
-  location_address?: string;
-  stripe_product_id?: string;
-  stripe_price_id?: string;
+  description?: string | null;
+  payment_fee?: number | null;
+  location_phone_number?: string | null;
+  location_address?: string | null;
+  stripe_product_id?: string | null;
+  stripe_price_id?: string | null;
   created_at: string;
 }
+export type TEventTypeCreateInput = Omit<EventType, "id" | "created_at">;
+export type TEventTypeUpdateParams = Partial<
+  Omit<EventType, "id" | "user_id" | "created_at">
+>;
 
 export type TEventTypeQuestionType = "TEXT" | "RADIO" | "CHECKBOX";
 export interface EventTypeQuestion {
@@ -78,26 +96,56 @@ export interface EventTypeQuestion {
   order: number;
   is_optional: boolean;
 }
+export type TEventTypeQuestionCreateInput = Omit<EventTypeQuestion, "id">;
+export type TEventTypeQuestionUpdateParams = Partial<
+  Omit<EventType, "id" | "event_type_id">
+>;
 
 export interface EventTypeQuestionPossibleAnswer {
   id: string;
   question_id: string;
   value: string;
 }
+export type TEventTypeQuestionPossibleAnswerCreateInput = Omit<
+  EventTypeQuestionPossibleAnswer,
+  "id"
+>;
+export type TEventTypeQuestionPossibleAnswerUpdateParams = Partial<
+  Omit<EventTypeQuestionPossibleAnswer, "id" | "question_id">
+>;
+
+export interface EventSchedule {
+  id: string;
+  start_date_time: string;
+  end_date_time: string;
+  duration: number;
+}
+export type TEventScheduleCreateInput = Omit<EventSchedule, "id">;
+export type TEventScheduleUpdateParams = Partial<Omit<EventSchedule, "id">>;
 
 export interface CalendarEvent {
   id: string;
   google_id: string;
-  event_id?: string;
-  start_date_time: string;
-  end_date_time: string;
+  user_id: string;
+  event_schedule_id: string;
+  event_id?: string | null;
   google_link: string;
+  google_meets_link?: string | null;
 }
+export type TCalendarEventCreateInput = Omit<CalendarEvent, "id">;
+export type TCalendarEventUpdateParams = Partial<
+  Omit<
+    CalendarEvent,
+    "id" | "google_id" | "user_id" | "schedule_id" | "event_id"
+  >
+>;
 
 export type TPaymentStatusType = "WAITING" | "SUCCESS" | "FAIL";
 export interface Payment {
   id: string;
-  user_id?: string;
+  user_id?: string | null;
+  stripe_session_id: string;
+  stripe_payment_intent_id: string;
   status: TPaymentStatusType;
   total_fee: number;
   application_fee: number;
@@ -105,6 +153,13 @@ export interface Payment {
   created_at: string;
   updated_at: string;
 }
+export type TPaymentCreateInput = Omit<
+  Payment,
+  "id" | "status" | "created_at" | "updated_at"
+>;
+export type TPaymentUpdateParams = Partial<
+  Omit<Payment, "id" | "user_id" | "created_at">
+>;
 
 export type TEventStatusType =
   | "PENDING_PAYMENT"
@@ -114,21 +169,30 @@ export type TEventStatusType =
 
 export interface Event {
   id: string;
-  user_id?: string;
+  user_id?: string | null;
   event_type_id: string;
+  event_schedule_id: string;
   payment_id: string;
   status: TEventStatusType;
   user_email: string;
   invitee_email: string;
   invitee_full_name: string;
-  google_meets_link?: string;
-  cancelled_at?: string;
+  cancelled_at?: string | null;
   created_at: string;
 }
+export type TEventCreateInput = Omit<Event, "id" | "created_at">;
+export type TEventUpdateParams = Partial<
+  Omit<Event, "id" | "user_id" | "event_type_id" | "payment_id" | "created_at">
+>;
 
-export type TCreateInput<DbType> = Omit<
-  DbType,
-  "id" | "created_at" | "updated_at"
+export interface EventAnswer {
+  event_id: string;
+  question_id: string;
+  value: string;
+}
+export type TEventAnswerCreateInput = EventAnswer;
+export type TEventAnswerUpdateParams = Partial<
+  Omit<EventAnswer, "event_id" | "question_id">
 >;
 
 /**

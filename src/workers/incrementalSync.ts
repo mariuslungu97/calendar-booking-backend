@@ -8,7 +8,7 @@ import googleAuthStore from "../services/googleAuthClients";
 
 import { syncCalendarEvents } from "../utils/sync";
 
-import { TSyncJob, Connection } from "../types";
+import { TSyncJob } from "../types";
 
 type TSyncErrorReason = "SYNC_TOKEN_NOT_FOUND" | "INVALID_SYNC_TOKEN";
 export class IncrementalSyncError extends Error {
@@ -25,12 +25,12 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
   try {
     const googleConnection = (
       await knexClient
-        .select("id", "access_token", "refresh_token", "sync_token")
-        .from<Connection>("connections")
-        .where({ user_id: userId, provider: "GOOGLE" })
+        .select("calendar_sync_token")
+        .from("users")
+        .where({ id: userId })
     )[0];
 
-    if (!googleConnection.sync_token)
+    if (!googleConnection.calendar_sync_token)
       throw new IncrementalSyncError(
         "Couldn't find a sync token for user with provided id!",
         "SYNC_TOKEN_NOT_FOUND"
@@ -42,7 +42,7 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
 
     const { getEvents } = calendarApi(authClient);
     const { data, syncToken, isSyncTokenInvalid } = await getEvents({
-      syncToken: googleConnection.sync_token,
+      syncToken: googleConnection.calendar_sync_token,
     });
 
     if (isSyncTokenInvalid)
@@ -53,9 +53,9 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
 
     await syncCalendarEvents(data, userId);
 
-    await knexClient("connections")
-      .where({ id: googleConnection.id })
-      .update({ syncToken });
+    await knexClient("users")
+      .where({ id: userId })
+      .update({ calendar_sync_token: syncToken });
 
     return;
   } catch (err) {

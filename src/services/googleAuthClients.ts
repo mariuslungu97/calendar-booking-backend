@@ -4,7 +4,7 @@ import logger from "../loaders/logger";
 import knexClient from "../loaders/knex";
 import oAuthApi from "./googleOAuth";
 
-import { Connection, IGoogleAuthClientsStore } from "../types";
+import { IGoogleAuthClientsStore } from "../types";
 
 type TAuthClientDict = { [id: string]: OAuth2Client };
 
@@ -17,7 +17,7 @@ const handleAccessTokenRefresh = async (
   if (userId in appAuthClients && tokens.access_token) {
     const authClient = appAuthClients[userId];
     try {
-      const updatedConnection = await knexClient("connections")
+      const updatedConnection = await knexClient("oauth_connections")
         .where({ user_id: userId, provider: "GOOGLE" })
         .update(
           {
@@ -61,9 +61,14 @@ const hydrateStore = async () => {
   try {
     const connections = await knexClient()
       .select()
-      .from<Connection>("connections");
+      .from("oauth_connections")
+      .where({ provider: "GOOGLE" });
     for (const connection of connections) {
       const authClient = oAuthApi.getOAuthClient();
+      authClient.setCredentials({
+        access_token: connection.access_token,
+        refresh_token: connection.refresh_token,
+      });
       authClient.on("tokens", (newTokens) =>
         handleAccessTokenRefresh(connection.user_id, newTokens)
       );
