@@ -1,8 +1,7 @@
 import { calendar_v3 } from "googleapis";
+import dayjs from "dayjs";
 
 import knexClient from "../loaders/knex";
-
-import { CalendarEvent, CalendarEventCreateInput } from "../types";
 
 const syncCalendarEvents = async (
   calendarEvents: calendar_v3.Schema$Event[],
@@ -11,49 +10,87 @@ const syncCalendarEvents = async (
   try {
     for (const calendarEvent of calendarEvents) {
       if (!calendarEvent.id) return;
-      const isCancelled =
-        calendarEvent.status && calendarEvent.status === "cancelled";
+
       const dbCalendarEvent = await knexClient
-        .select("id")
-        .from<CalendarEvent>("calendar_events")
+        .select("id", "google_id", "event_id", "event_schedule_id")
+        .from("calendar_events")
         .where({ google_id: calendarEvent.id });
 
+      const isCancelled =
+        calendarEvent.status && calendarEvent.status === "cancelled";
+
+      const dbAssociatedEventId = dbCalendarEvent[0].event_id;
+
       if (isCancelled && dbCalendarEvent.length !== 0) {
-        // delete record
+        // record exists in db; delete it and update associated event to reflect change
+
         await knexClient("calendar_events")
           .where({ id: dbCalendarEvent[0].id })
           .del();
+
+        if (dbAssociatedEventId) {
+          await knexClient("events").where({ id: dbAssociatedEventId }).update({
+            status: "CANCELLED",
+            cancelled_at: new Date().toISOString(),
+          });
+        }
       } else if (!isCancelled && dbCalendarEvent.length !== 0) {
-        // update record
-        const updatedProperties: Partial<CalendarEvent> = {
-          start_date_time: calendarEvent.start?.dateTime as string,
-          end_date_time: calendarEvent.end?.dateTime as string,
-          google_link:
-            calendarEvent.htmlLink !== null
-              ? calendarEvent.htmlLink
-              : undefined,
-          google_meets_link:
-            calendarEvent.conferenceData?.conferenceId !== null
-              ? calendarEvent.conferenceData?.conferenceId
-              : undefined,
-        };
-        await knexClient("calendar_events")
-          .where({ id: dbCalendarEvent[0].id })
-          .update({ ...updatedProperties });
-      } else if (!isCancelled && !dbCalendarEvent) {
-        // insert record
-        const newCalendarEvent: CalendarEventCreateInput = {
+        // record exists in db; update its associated schedule if it changed
+        // you should inform the user something the schedule has changed and allow him to cancel
+        // if it does not fit his schedule
+        const dbCalendarEventSchedule = (
+          await knexClient("event_schedules")
+            .select()
+            .where({ id: dbCalendarEvent[0].event_schedule_id })
+        )[0];
+
+        const startDateTime = new Date(
+          calendarEvent.start?.dateTime as string
+        ).toISOString();
+        const endDateTime = new Date(
+          calendarEvent.end?.dateTime as string
+        ).toISOString();
+        const duration = dayjs(endDateTime).diff(
+          dayjs(startDateTime),
+          "minute"
+        );
+
+        if (
+          startDateTime !== dbCalendarEventSchedule.start_date_time ||
+          endDateTime !== dbCalendarEventSchedule.end_date_time
+        ) {
+          // update record
+          await knexClient("event_schedules")
+            .where({ id: dbCalendarEvent[0].event_schedule_id })
+            .update({
+              start_date_time: startDateTime,
+              end_date_time: endDateTime,
+              duration,
+            });
+          // TODO notify invitee of change
+        }
+      } else if (!isCancelled && dbCalendarEvent.length === 0) {
+        // create new event schedule and calendar event
+        const startDateTime = dayjs(calendarEvent.start?.dateTime as string);
+        const endDateTime = dayjs(calendarEvent.end?.dateTime as string);
+        const duration = endDateTime.clone().diff(startDateTime, "minute");
+        // create schedule
+        const eventSchedule = await knexClient("event_schedules").insert(
+          {
+            start_date_time: startDateTime.unix().toString(),
+            end_date_time: endDateTime.unix().toString(),
+            duration,
+          },
+          ["id"]
+        );
+
+        // create calendar event
+        await knexClient("calendar_events").insert({
           user_id: userId,
+          event_schedule_id: eventSchedule[0].id,
           google_id: calendarEvent.id,
-          start_date_time: calendarEvent.start?.dateTime as string,
-          end_date_time: calendarEvent.end?.dateTime as string,
           google_link: calendarEvent.htmlLink as string,
-          google_meets_link:
-            calendarEvent.conferenceData?.conferenceId !== null
-              ? calendarEvent.conferenceData?.conferenceId
-              : undefined,
-        };
-        await knexClient("calendar_events").insert({ ...newCalendarEvent });
+        });
       }
     }
     return;

@@ -130,7 +130,6 @@ export interface CalendarEvent {
   event_schedule_id: string;
   event_id?: string | null;
   google_link: string;
-  google_meets_link?: string | null;
 }
 export type TCalendarEventCreateInput = Omit<CalendarEvent, "id">;
 export type TCalendarEventUpdateParams = Partial<
@@ -177,6 +176,9 @@ export interface Event {
   user_email: string;
   invitee_email: string;
   invitee_full_name: string;
+  user_timezone: string;
+  invitee_timezone: string;
+  location_value: string;
   cancelled_at?: string | null;
   created_at: string;
 }
@@ -356,6 +358,67 @@ export interface IStripeApi {
   createPaymentSession: (
     params: TStripeCreatePaymentSessionParams
   ) => Promise<Stripe.Checkout.Session | null>;
+}
+
+/**
+ * Emails Transport
+ */
+
+export type TVerifyEmailPayload = {
+  username: string;
+  userFirstName: string;
+};
+
+export type TEventConfirmationPayload = {
+  eventId: string;
+  eventTypeName: string;
+  displayTimezone: string;
+  eventDateTime: { start: string; end: string };
+  eventLocation: string;
+};
+
+export type TEventNotifyUpdatePayload = {
+  eventId: string;
+  eventTypeName: string;
+  eventLocation: string;
+  displayTimezone: string;
+  pastDateTime: { start: string; end: string };
+  newDateTime: { start: string; end: string };
+};
+
+export type TTwoFactorAuthPayload = {
+  username: string;
+  userFirstName: string;
+};
+
+export type TSendMailParams =
+  | {
+      to: string;
+      type: "VERIFY_EMAIL";
+      payload: TVerifyEmailPayload;
+    }
+  | {
+      to: string;
+      type: "EVENT_CONFIRMATION";
+      payload: TEventConfirmationPayload;
+    }
+  | {
+      to: string;
+      type: "NOTIFY_EVENT_UPDATE";
+      payload: TEventNotifyUpdatePayload;
+    }
+  | {
+      to: string;
+      type: "TWO_FACTOR_AUTH";
+      payload: TTwoFactorAuthPayload;
+    };
+
+export type TSendMailType = TSendMailParams["type"];
+export type TSendMailPayload = TSendMailParams["payload"];
+export type TMailJobData = TSendMailParams;
+
+export interface IMailService {
+  sendMail: (params: TSendMailParams) => Promise<void>;
 }
 
 /**

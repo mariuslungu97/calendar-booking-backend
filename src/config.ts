@@ -15,7 +15,9 @@ const config = {
     port: +mandatoryEnv(process.env.APP_PORT, "APP_PORT"),
     proto: mandatoryEnv(process.env.APP_PROTO, "APP_PROTO"),
     host: process.env.APP_HOST || "localhost",
+    name: process.env.APP_NAME || "My Booking App",
     uri: `${process.env.APP_PROTO}://${process.env.APP_HOST}:${process.env.APP_PORT}`,
+    jwtSecret: mandatoryEnv(process.env.APP_JWT_SECRET, "APP_JWT_SECRET"),
   },
   db: {
     host: mandatoryEnv(process.env.APP_DB_HOST, "APP_DB_HOST"),
@@ -37,6 +39,12 @@ const config = {
       process.env.APP_GOOGLE_REDIRECT_URI || "/google/oauth/callback",
     calendarWebhookUri:
       process.env.APP_GOOGLE_CALENDAR_WEBHOOK_URI || "/google/calendar/events",
+  },
+  smtp: {
+    host: process.env.APP_SMTP_HOST,
+    port: process.env.APP_SMTP_PORT && +process.env.APP_SMTP_PORT,
+    user: process.env.APP_SMTP_USER,
+    pass: process.env.APP_SMTP_PASS,
   },
   stripe: {
     apiKey: mandatoryEnv(process.env.STRIPE_API_KEY, "STRIPE_API_KEY"),

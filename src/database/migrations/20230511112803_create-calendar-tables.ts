@@ -144,8 +144,7 @@ export async function up(knex: Knex): Promise<void> {
                   enumName: "location_type",
                   useNative: true,
                 });
-                table.string("location_phone_number");
-                table.string("location_address");
+                table.string("location_value");
 
                 table.string("stripe_price_id");
                 table.string("stripe_product_id");
@@ -261,7 +260,6 @@ export async function up(knex: Knex): Promise<void> {
                   .onDelete("RESTRICT");
 
                 table.string("google_link").notNullable();
-                table.string("google_meets_link");
               });
             }
           });
@@ -346,6 +344,10 @@ export async function up(knex: Knex): Promise<void> {
                 table.string("user_email").notNullable();
                 table.string("invitee_email").notNullable();
                 table.string("invitee_full_name").notNullable();
+
+                table.string("user_timezone").notNullable();
+                table.string("invitee_timezone").notNullable();
+                table.string("location_value").notNullable();
 
                 table.timestamp("created_at").defaultTo(knex.fn.now());
                 table.timestamp("cancelled_at");
