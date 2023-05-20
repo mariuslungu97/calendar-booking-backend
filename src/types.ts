@@ -222,10 +222,29 @@ export interface IGoogleOAuthApi {
  */
 
 export interface IGoogleAuthClientsStore {
-  addClient: (userId: string, authClient: OAuth2Client) => void;
-  removeClient: (userId: string) => void;
+  addClient: (
+    userId: string,
+    authClient: OAuth2Client,
+    publish: boolean
+  ) => void;
+  removeClient: (userId: string, publish: boolean) => void;
   getClient: (userId: string) => OAuth2Client | null;
+  isClientInStore: (userId: string) => boolean;
   hydrateStore: () => Promise<void>;
+}
+
+/**
+ * Google OAuth Clients PubSub
+ */
+
+export type TAuthClientsPubSubAction = "ADD" | "DELETE";
+export type TAuthClientsPubSubMessage = {
+  action: TAuthClientsPubSubAction;
+  userId: string;
+};
+
+export interface IGoogleAuthClientsPubSubApi {
+  publish: (message: TAuthClientsPubSubMessage) => Promise<void>;
 }
 
 /**

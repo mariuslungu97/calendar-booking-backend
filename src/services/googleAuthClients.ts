@@ -3,6 +3,7 @@ import { OAuth2Client, Credentials } from "google-auth-library";
 import logger from "../loaders/logger";
 import knexClient from "../loaders/knex";
 import oAuthApi from "./googleOAuth";
+import authClientsPubSubApi from "./authClientsPubSub";
 
 import { IGoogleAuthClientsStore } from "../types";
 
@@ -37,18 +38,26 @@ const handleAccessTokenRefresh = async (
   }
 };
 
-const addClient = (userId: string, authClient: OAuth2Client) => {
+const addClient = (
+  userId: string,
+  authClient: OAuth2Client,
+  publish = true
+) => {
   if (userId in appAuthClients) return;
   authClient.on("tokens", (newTokens) =>
     handleAccessTokenRefresh(userId, newTokens)
   );
   appAuthClients[userId] = authClient;
+
+  if (publish) authClientsPubSubApi.publish({ action: "ADD", userId });
 };
 
-const removeClient = (userId: string) => {
+const removeClient = (userId: string, publish = true) => {
   if (!(userId in appAuthClients)) return;
 
   delete appAuthClients[userId];
+
+  if (publish) authClientsPubSubApi.publish({ action: "DELETE", userId });
 };
 
 const getClient = (userId: string) => {
@@ -56,6 +65,8 @@ const getClient = (userId: string) => {
 
   return appAuthClients[userId];
 };
+
+const isClientInStore = (userId: string) => userId in appAuthClients;
 
 const hydrateStore = async () => {
   try {
@@ -84,6 +95,7 @@ const googleAuthStore: IGoogleAuthClientsStore = {
   addClient,
   removeClient,
   getClient,
+  isClientInStore,
   hydrateStore,
 };
 
