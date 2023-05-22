@@ -225,9 +225,9 @@ export interface IGoogleAuthClientsStore {
   addClient: (
     userId: string,
     authClient: OAuth2Client,
-    publish: boolean
+    publish?: boolean
   ) => void;
-  removeClient: (userId: string, publish: boolean) => void;
+  removeClient: (userId: string, publish?: boolean) => void;
   getClient: (userId: string) => OAuth2Client | null;
   isClientInStore: (userId: string) => boolean;
   hydrateStore: () => Promise<void>;
