@@ -11,25 +11,102 @@ import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
+import { TDayjsSlot } from "../types";
+
 dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-type TTimeSlotString = [string, string];
+type TOverlapSide = "lower" | "upper";
 
 class TimeSlot {
   private _from: Dayjs;
   private _to: Dayjs;
 
-  static fromDayJs(from: Dayjs, to: Dayjs) {
-    return new TimeSlot([from.format("HH:mm"), to.format("HH:mm")]);
+  constructor(from: Dayjs, to: Dayjs) {
+    if (to.isSameOrBefore(from, "minute"))
+      throw new Error("Cannot instantiate a time slot with to <= from!");
+
+    this._from = from.clone();
+    this._to = to.clone();
   }
 
-  constructor(timeSlotStr: TTimeSlotString) {
-    this._from = dayjs(timeSlotStr[0], "HH:mm");
-    this._to = dayjs(timeSlotStr[1], "HH:mm");
+  isWithinBounds(boundedSlot: TimeSlot) {
+    if (
+      boundedSlot.from.isSameOrAfter(this._from, "minute") &&
+      boundedSlot.to.isSameOrBefore(this._to, "minute")
+    )
+      return true;
+
+    return false;
+  }
+
+  overlapsWith(overlappingSlot: TimeSlot): TOverlapSide | null {
+    if (
+      overlappingSlot.to.isSameOrAfter(this._from, "minute") &&
+      overlappingSlot.to.isSameOrBefore(this._to, "minute")
+    )
+      return "upper";
+
+    if (
+      overlappingSlot.from.isSameOrAfter(this._from, "minute") &&
+      overlappingSlot.from.isSameOrBefore(this._to, "minute")
+    )
+      return "lower";
+
+    return null;
+  }
+
+  isEnveloped(envelopingSlot: TimeSlot) {
+    if (envelopingSlot.isWithinBounds(this)) return true;
+    return false;
+  }
+
+  cut(slot: TimeSlot): TimeSlot[] {
+    if (this.isWithinBounds(slot)) {
+      const areLowerBoundsIdentical = slot.from.isSame(this._from, "minute");
+      const areUpperBoundsIdentical = slot.to.isSame(this._to, "minute");
+
+      const newSlots: TimeSlot[] = [];
+      if (!areLowerBoundsIdentical)
+        newSlots.push(new TimeSlot(this._from, slot.from));
+      if (!areUpperBoundsIdentical)
+        newSlots.push(new TimeSlot(slot.to, this._to));
+
+      return newSlots;
+    } else if (this.isEnveloped(slot)) {
+      return [];
+    } else if (this.overlapsWith(slot)) {
+      const overlapSide = this.overlapsWith(slot);
+
+      if (overlapSide === "lower" && !slot.from.isSame(this._from))
+        return [new TimeSlot(this._from, slot.from)];
+      else if (overlapSide === "upper" && !slot.to.isSame(this._to))
+        return [new TimeSlot(slot.to, this._to)];
+      else return [];
+    } else return [this];
+  }
+
+  slice(duration: number, offset: number): TimeSlot[] {
+    const slices: TimeSlot[] = [];
+    let start = this._from.clone();
+    let end = start.add(duration, "minute");
+
+    let curr = new TimeSlot(start, end);
+    while (this.isWithinBounds(curr)) {
+      slices.push(curr);
+      start = start.add(offset, "minute");
+      end = start.add(duration, "minute");
+      curr = new TimeSlot(start, end);
+    }
+
+    return slices;
+  }
+
+  toString() {
+    return [this._from.format("HH:mm"), this._to.format("HH:mm")];
   }
 
   get from() {
@@ -38,81 +115,36 @@ class TimeSlot {
   get to() {
     return this._to.clone();
   }
-
-  isWithinBounds(otherTimeSlot: TimeSlot) {
-    return (
-      otherTimeSlot.from.isSameOrAfter(this._from, "minute") &&
-      otherTimeSlot.to.isSameOrBefore(this._to, "minute")
-    );
-  }
-
-  getAvailableMeetings(meetingDuration: number, offset: number): TimeSlot[] {
-    const possibleMeetings: TimeSlot[] = [];
-
-    let start = this._from.clone();
-    let end = this._from.clone().add(meetingDuration, "minute");
-
-    let curr = TimeSlot.fromDayJs(start, end);
-    while (this.isWithinBounds(curr)) {
-      possibleMeetings.push(curr);
-      start = start.add(offset, "minute");
-      end = start.clone().add(meetingDuration, "minute");
-      curr = TimeSlot.fromDayJs(start, end);
-    }
-
-    return possibleMeetings;
-  }
-
-  halve(timeSlot: TimeSlot): TimeSlot[] {
-    if (!this.isWithinBounds(timeSlot))
-      throw new Error(
-        "You cannot subtract a timeslot which is not within the bounds of the timeslot being subtracted from!"
-      );
-
-    const former = TimeSlot.fromDayJs(this._from, timeSlot.from);
-    const latter = TimeSlot.fromDayJs(timeSlot.to, this._to);
-
-    return [former, latter];
-  }
-
-  toString(): TTimeSlotString {
-    return [this.from.format("HH:mm"), this.to.format("HH:mm")];
-  }
 }
 
 class TimePeriod {
-  private _slots: TimeSlot[] = [];
+  private _schedule: TimeSlot[] = [];
 
-  constructor(slots: TTimeSlotString[]) {
-    for (const timeSlotStr of slots) {
-      const timeSlot = new TimeSlot(timeSlotStr);
-      this._slots.push(timeSlot);
+  constructor(slots: TimeSlot[]) {
+    for (const timeSlot of slots) {
+      this._schedule.push(timeSlot);
     }
   }
 
-  erase(slot: TimeSlot) {
-    let subtractSlotIdx = -1;
+  erase(bookedSlot: TimeSlot) {
+    const alteredSchedule: TimeSlot[] = [];
 
-    const subtractedSlot = this._slots.find((timeSlot, idx) => {
-      if (timeSlot.isWithinBounds(slot)) {
-        subtractSlotIdx = idx;
-        return timeSlot;
-      }
-    });
-
-    if (subtractSlotIdx !== -1 && subtractedSlot) {
-      this._slots.splice(subtractSlotIdx, 1, ...subtractedSlot.halve(slot));
+    for (const scheduleSlot of this._schedule) {
+      const alteredSlot = scheduleSlot.cut(bookedSlot);
+      alteredSchedule.push(...alteredSlot);
     }
+
+    this._schedule = alteredSchedule;
   }
 
   getAvailableMeetings(meetingDuration: number, offset: number): TimeSlot[] {
-    return this._slots
-      .map((slot) => slot.getAvailableMeetings(meetingDuration, offset))
+    return this._schedule
+      .map((slot) => slot.slice(meetingDuration, offset))
       .flat();
   }
 
   isSlotAvailable(slot: TimeSlot): boolean {
-    for (const timeSlot of this._slots) {
+    for (const timeSlot of this._schedule) {
       if (timeSlot.isWithinBounds(slot)) return true;
     }
 
@@ -121,15 +153,22 @@ class TimePeriod {
 }
 
 const getAvailableTimeSlots = (
-  schedule: TTimeSlotString[],
-  booked: TTimeSlotString[],
+  schedule: TDayjsSlot[],
+  booked: TDayjsSlot[],
   duration: number,
   offset?: number
-) => {
-  const availablePeriod = new TimePeriod(schedule);
+): TimeSlot[] => {
+  let timeSlots: TimeSlot[] = [];
 
-  for (const bookedSlotStr of booked) {
-    const bookedSlot = new TimeSlot(bookedSlotStr);
+  for (const dayjsSlot of schedule) {
+    const timeSlot = new TimeSlot(dayjsSlot[0], dayjsSlot[1]);
+    timeSlots.push(timeSlot);
+  }
+
+  const availablePeriod = new TimePeriod(timeSlots);
+
+  for (const bookedDayjsSlot of booked) {
+    const bookedSlot = new TimeSlot(bookedDayjsSlot[0], bookedDayjsSlot[1]);
     availablePeriod.erase(bookedSlot);
   }
 
@@ -137,22 +176,30 @@ const getAvailableTimeSlots = (
     duration,
     offset || duration
   );
-  return availableMeetings.map((meeting) => meeting.toString());
+
+  return availableMeetings;
 };
 
 const isTimeSlotAvailable = (
-  schedule: TTimeSlotString[],
-  booked: TTimeSlotString[],
-  slot: TTimeSlotString
+  schedule: TDayjsSlot[],
+  booked: TDayjsSlot[],
+  slot: TDayjsSlot
 ) => {
-  const timePeriod = new TimePeriod(schedule);
+  let scheduleTimeSlots: TimeSlot[] = [];
 
-  for (const bookedSlotStr of booked) {
-    const bookedSlot = new TimeSlot(bookedSlotStr);
+  for (const dayjsSlot of schedule) {
+    const timeSlot = new TimeSlot(dayjsSlot[0], dayjsSlot[1]);
+    scheduleTimeSlots.push(timeSlot);
+  }
+
+  const timePeriod = new TimePeriod(scheduleTimeSlots);
+
+  for (const bookedDayjsSlot of booked) {
+    const bookedSlot = new TimeSlot(bookedDayjsSlot[0], bookedDayjsSlot[1]);
     timePeriod.erase(bookedSlot);
   }
 
-  return timePeriod.isSlotAvailable(new TimeSlot(slot));
+  return timePeriod.isSlotAvailable(new TimeSlot(slot[0], slot[1]));
 };
 
 const getMonthStartEnd = (month: string): [Dayjs, Dayjs] => {
@@ -170,12 +217,16 @@ const getMonthStartEnd = (month: string): [Dayjs, Dayjs] => {
 
 const getDateStartEnd = (
   date: string,
+  timezone: string = "Etc/UTC",
   dateFormat = "DD-MM-YYYY"
 ): [Dayjs, Dayjs] => {
   const dateStart = dayjs(date, dateFormat).hour(0).minute(0).second(0);
   const dateEnd = dayjs(date, dateFormat).hour(23).minute(59).second(59);
 
-  return [dateStart, dateEnd];
+  const dateStartLocal = dayjs.tz(dateStart, timezone);
+  const dateEndLocal = dayjs.tz(dateEnd, timezone);
+
+  return [dateStartLocal, dateEndLocal];
 };
 
 const convertDayTime = (
@@ -196,10 +247,25 @@ const convertDayTime = (
   return [dateConvert.day(), dateConvert.format("HH:mm")];
 };
 
+const dayTimeToDate = (day: number, time: string, tz: string): Dayjs => {
+  const timeStrSplit = time.split(":");
+  const timeHour = parseInt(timeStrSplit[0]);
+  const timeMinutes = parseInt(timeStrSplit[1]);
+
+  const date = dayjs().day(day).hour(timeHour).minute(timeMinutes);
+  const dateLocal = dayjs.tz(date, tz);
+
+  return dateLocal;
+};
+
+const tzSwap = (date: Dayjs, newTz: string) => date.tz(newTz);
+
 export {
   getAvailableTimeSlots,
   isTimeSlotAvailable,
   getMonthStartEnd,
   getDateStartEnd,
   convertDayTime,
+  dayTimeToDate,
+  tzSwap,
 };
