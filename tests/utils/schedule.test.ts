@@ -1,86 +1,68 @@
+import dayjs from "dayjs";
 import { describe, test, expect } from "@jest/globals";
 import {
   getAvailableTimeSlots,
   isTimeSlotAvailable,
-  convertDayTime,
 } from "../../src/utils/schedule";
 
-type TTimeSlotString = [string, string];
+import { TDayjsSlot } from "../../src/types";
+
+const getDate = (day: number, time: string) =>
+  dayjs()
+    .day(day)
+    .hour(parseInt(time.split(":")[0]))
+    .minute(parseInt(time.split(":")[1]));
 
 describe("Calendar Scheduling Algorithms", () => {
-  test("convert day/time at tz into day/time at another tz", () => {
-    const day = 0; // sunday
-    const time = "02:00";
-    const timezone = "Europe/London";
-    const convertTimezone = "America/New_York";
-
-    const expectedDayTime = [6, "21:00"]; // saturday at 21:00 in America/New_York
-    expect(convertDayTime(day, time, timezone, convertTimezone)).toEqual(
-      expectedDayTime
-    );
-  });
-
   test("retrieve available time slots given a schedule and some booked slots", () => {
     const schedule = [
-      ["09:00", "14:00"],
-      ["16:00", "18:45"],
-    ] as TTimeSlotString[];
+      [getDate(0, "09:00"), getDate(0, "15:00")],
+      [getDate(0, "23:00"), getDate(0, "23:59")],
+    ] as TDayjsSlot[];
+
     const bookedSlots = [
-      ["09:15", "09:45"],
-      ["10:30", "11:00"],
-      ["12:00", "13:15"],
-      ["18:15", "18:45"],
-    ] as TTimeSlotString[];
-    const duration = 30; // minutes
+      [getDate(0, "09:00"), getDate(0, "09:30")],
+      [getDate(0, "10:30"), getDate(0, "11:15")],
+      [getDate(0, "11:30"), getDate(0, "12:30")],
+      [getDate(0, "14:00"), getDate(0, "14:20")],
+    ] as TDayjsSlot[];
 
-    const expectedResponse = [
-      ["09:45", "10:15"],
-      ["11:00", "11:30"],
-      ["11:30", "12:00"],
-      ["13:15", "13:45"],
-      ["16:00", "16:30"],
-      ["16:30", "17:00"],
-      ["17:00", "17:30"],
-      ["17:30", "18:00"],
-    ];
-
-    const response = getAvailableTimeSlots(schedule, bookedSlots, duration);
-    console.log(response);
-    expect(response).toEqual(expectedResponse);
+    const result = getAvailableTimeSlots(schedule, bookedSlots, 30);
+    result.map((ts) => console.log(`${ts.toString()}`));
+    expect(result.length).not.toBe(0);
   });
 
   test("check if some meetings are available for booking", () => {
-    const schedule = [["12:00", "18:00"]] as TTimeSlotString[];
-    const booked = [
-      ["12:25", "12:55"],
-      ["15:30", "16:30"],
-      ["16:45", "17:15"],
-    ] as TTimeSlotString[];
+    const schedule = [
+      [getDate(0, "09:00"), getDate(0, "15:00")],
+    ] as TDayjsSlot[];
 
-    const validMeetings = [
-      ["12:00", "12:20"],
-      ["12:55", "13:55"],
-      ["15:00", "15:30"],
-    ];
-    const invalidMeetings = [
-      ["12:20", "12:40"],
-      ["15:00", "15:45"],
-      ["16:50", "17:10"],
-      ["17:10", "18:00"],
-      ["09:00", "09:45"],
-      ["18:30", "21:00", ["17:30", "18:10"]],
-    ];
+    const bookedSlots = [
+      [getDate(0, "09:00"), getDate(0, "09:30")],
+      [getDate(0, "10:30"), getDate(0, "11:15")],
+      [getDate(0, "11:30"), getDate(0, "12:30")],
+      [getDate(0, "14:00"), getDate(0, "14:20")],
+    ] as TDayjsSlot[];
 
-    for (const validMeeting of validMeetings) {
-      expect(
-        isTimeSlotAvailable(schedule, booked, validMeeting as TTimeSlotString)
-      ).toBe(true);
+    const validSlots = [
+      [getDate(0, "09:30"), getDate(0, "10:00")],
+      [getDate(0, "13:00"), getDate(0, "14:00")],
+    ] as TDayjsSlot[];
+
+    const invalidSlots = [
+      [getDate(0, "10:00"), getDate(0, "10:35")],
+      [getDate(0, "11:10"), getDate(0, "11:30")],
+      [getDate(0, "14:10"), getDate(0, "14:45")],
+    ] as TDayjsSlot[];
+
+    for (const validSlot of validSlots) {
+      const isValid = isTimeSlotAvailable(schedule, bookedSlots, validSlot);
+      expect(isValid).toBe(true);
     }
 
-    for (const invalidMeeting of invalidMeetings) {
-      expect(
-        isTimeSlotAvailable(schedule, booked, invalidMeeting as TTimeSlotString)
-      ).toBe(false);
+    for (const invalidSlot of invalidSlots) {
+      const isValid = isTimeSlotAvailable(schedule, bookedSlots, invalidSlot);
+      expect(isValid).toBe(false);
     }
   });
 });

@@ -1,6 +1,7 @@
 import { calendar_v3 } from "googleapis";
 import { Credentials, OAuth2Client } from "google-auth-library";
 import { JobsOptions } from "bullmq";
+import { Dayjs } from "dayjs";
 import Stripe from "stripe";
 
 export type TUserSessionData = { id: string; email: string };
@@ -461,4 +462,41 @@ export class RestApiError extends Error {
     super(message);
     this.reason = reason;
   }
+}
+
+/**
+ * ==========================
+ * ========= MISC ===========
+ * ==========================
+ */
+
+export type TDayjsSlot = [Dayjs, Dayjs];
+export type TTimeSlotString = [string, string];
+
+export interface ScheduleWithPeriods {
+  schedule: Schedule;
+  periods: SchedulePeriod[];
+}
+
+export interface ReducedPeriod {
+  day: number;
+  start_time: Dayjs;
+  end_time: Dayjs;
+}
+
+export interface ReducedSchedule {
+  id: string;
+  timezone: string;
+  periods: ReducedPeriod[];
+}
+
+export interface DateSlots {
+  date: string;
+  slots: TTimeSlotString[];
+}
+
+export interface MonthSlots {
+  month: string;
+  timezone: string;
+  dates: DateSlots[];
 }
