@@ -149,17 +149,17 @@ const retrieveMonthSlots = async (
     // compute available events for each day of the month
     const daysInMonth = monthStart.daysInMonth();
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = monthStart.clone().date(day);
+      const dateInMonth = monthStart.clone().date(day);
       const dateSlots: DateSlots = {
-        date: date.format("DD-MM-YYYY"),
+        date: dateInMonth.format("DD-MM-YYYY"),
         slots: [],
       };
 
       const schedule = tzPeriods
-        .filter((tzPeriod) => tzPeriod.day === date.day())
+        .filter((tzPeriod) => tzPeriod.day === dateInMonth.day())
         .map((tzPeriod) => [
-          tzPeriod.start_time.date(date.date()),
-          tzPeriod.end_time.date(date.date()),
+          tzPeriod.start_time.date(dateInMonth.date()),
+          tzPeriod.end_time.date(dateInMonth.date()),
         ]) as TDayjsSlot[];
 
       if (!schedule.length) {
@@ -168,7 +168,7 @@ const retrieveMonthSlots = async (
       }
 
       const [startDate, endDate] = getDateStartEnd(
-        date.format("DD-MM-YYYY"),
+        dateInMonth.format("DD-MM-YYYY"),
         timezone
       );
       const bookedSlots = tzCalendarEvents
