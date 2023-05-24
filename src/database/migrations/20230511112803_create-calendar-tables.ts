@@ -26,6 +26,7 @@ export async function up(knex: Knex): Promise<void> {
               table.string("last_name").notNullable();
 
               table.boolean("is_email_verified").notNullable().defaultTo(false);
+              table.boolean("is_2fa_activated").notNullable().defaultTo(false);
 
               table.boolean("is_deleted").notNullable().defaultTo(false);
               table.timestamp("deleted_at");
@@ -149,7 +150,7 @@ export async function up(knex: Knex): Promise<void> {
                 table.string("stripe_price_id");
                 table.string("stripe_product_id");
 
-                table.timestamp("created_at").defaultTo(knex.fn.now());
+                table.timestamps(true, true);
               });
             }
             return;
@@ -349,7 +350,7 @@ export async function up(knex: Knex): Promise<void> {
                 table.string("invitee_timezone").notNullable();
                 table.string("location_value").notNullable();
 
-                table.timestamp("created_at").defaultTo(knex.fn.now());
+                table.timestamps(true, true);
                 table.timestamp("cancelled_at");
               });
             }

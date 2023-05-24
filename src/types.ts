@@ -20,6 +20,7 @@ export interface User {
   first_name: string;
   last_name: string;
   is_email_verified: boolean;
+  is_2fa_activated: boolean;
   calendar_sync_token?: string | null;
   stripe_account_id?: string | null;
   is_deleted: boolean;
@@ -82,6 +83,7 @@ export interface EventType {
   stripe_product_id?: string | null;
   stripe_price_id?: string | null;
   created_at: string;
+  updated_at: string;
 }
 export type TEventTypeCreateInput = Omit<EventType, "id" | "created_at">;
 export type TEventTypeUpdateParams = Partial<
@@ -182,6 +184,7 @@ export interface Event {
   location_value: string;
   cancelled_at?: string | null;
   created_at: string;
+  updated_at: string;
 }
 export type TEventCreateInput = Omit<Event, "id" | "created_at">;
 export type TEventUpdateParams = Partial<
