@@ -20,6 +20,7 @@
     "docker:prod:down": "docker compose -f docker-files/docker-compose.yml -f docker-files/docker-compose.prod.yml -p calendar-app down"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.0",
     "@types/express": "^4.17.17",
     "@types/express-session": "^1.17.7",
     "@types/jsonwebtoken": "^9.0.2",
@@ -31,14 +32,18 @@
   },
   "dependencies": {
     "@types/jest": "^29.5.1",
+    "bcrypt": "^5.1.0",
     "bullmq": "^3.13.4",
     "dayjs": "^1.11.7",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
     "googleapis": "^118.0.0",
+    "graphql": "^16.6.0",
+    "graphql-yoga": "^3.9.1",
     "handlebars": "^4.7.7",
     "ioredis": "^5.3.2",
     "jest": "^29.5.0",
+    "joi": "^17.9.2",
     "jsonwebtoken": "^9.0.0",
     "knex": "^2.4.2",
     "nodemailer": "^6.9.2",

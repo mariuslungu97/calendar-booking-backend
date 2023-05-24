@@ -1,12 +1,9 @@
-import { Request, NextFunction } from "express";
+import { Request } from "express";
 
-import { RestApiError } from "../../types";
+const isLoggedIn = (req: Request) => {
+  if (!req.session || !req.session.user) return false;
 
-const isLoggedIn = (req: Request, _: any, next: NextFunction) => {
-  if (!req.session.user)
-    throw new RestApiError("You are not authenticated!", "UNAUTHENTICATED");
-
-  return next();
+  return true;
 };
 
 export { isLoggedIn };

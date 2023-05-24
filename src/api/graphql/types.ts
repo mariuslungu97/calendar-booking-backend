@@ -2,12 +2,12 @@ const graphQlTypeDefs = `
   type User {
     username: String!
     email: String!
-    fullName: String!           # requires field resolver (first + last)
+    fullName: String!                         # requires field resolver (first + last)
     isVerified: Boolean!
     is2FaActivated: Boolean!    
     createdAt: String!
-    recentReceivedPayments: [Payment!]!       # returns 3 most recent received payments
-    recentUpdatedEventTypes: [EventType!]!    # returns 3 most recent updated/created event types
+    recentPayments: [Payment!]!               # returns 3 most recent received payments
+    recentEventTypes: [EventType!]!           # returns 3 most recent updated/created event types
     upcomingEvents: [Event!]!                 # returns 3 nearest upcoming events
   }
 
@@ -198,10 +198,19 @@ const graphQlTypeDefs = `
     pageInfo: PageInfo!
     edges: [Payment!]!
   }
+  
+  type AccountCreateResponse {
+    message: String!
+  }
 
-  type ApiResponse {
-    status: Int
-    message: String
+  type LoginResponse {
+    message: String!
+    is2FaActivated: Boolean!
+  }
+
+  type ConnectResponse {
+    message: String!
+    redirect: String!
   }
 
   type Query {
@@ -213,11 +222,11 @@ const graphQlTypeDefs = `
   }
 
   type Mutation {
-    createAccount(params: UserCreateInput!): ApiResponse!
-    login(email: String!, password: String!): ApiResponse!
+    createAccount(params: UserCreateInput!): AccountCreateResponse!
+    login(email: String!, password: String!): LoginResponse!
     activate2Fa(): User!
-    connectGoogleCalendar(): ApiResponse!
-    connectStripe(): ApiResponse!
+    connectGoogleCalendar(): ConnectResponse!
+    connectStripe(): ConnectResponse!
     createEventType(params: EventTypeCreateInput!): EventType!
     updateEventType(params: EventTypeUpdateInput!): EventType!
     updateEventTypeSchedule(params: EventTypeUpdateScheduleInput!): EventType!
