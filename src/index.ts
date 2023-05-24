@@ -1,5 +1,6 @@
 import express from "express";
 
+import yoga from "./loaders/graphql";
 import config from "./config";
 import googleRouter from "./api/routes/googleRoutes";
 import googleAuthStore from "./services/googleAuthClients";
@@ -18,6 +19,7 @@ const { port } = config.app;
 const app = express();
 
 app.use("/api", googleRouter);
+app.use(yoga.graphqlEndpoint, yoga);
 
 app.listen(port, async () => {
   console.log(`Listening on port ${port}!`);
