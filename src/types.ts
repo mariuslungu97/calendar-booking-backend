@@ -3,6 +3,8 @@ import { Credentials, OAuth2Client } from "google-auth-library";
 import { JobsOptions } from "bullmq";
 import { Dayjs } from "dayjs";
 import Stripe from "stripe";
+import { Request, Response } from "express";
+import { Knex } from "knex";
 
 export type TUserSessionData = { id: string; email: string };
 
@@ -27,7 +29,13 @@ export interface User {
   deleted_at?: string | null;
   created_at: string;
 }
-export type TUserCreateInput = Omit<User, "id" | "created_at">;
+export type TUserCreateInput = {
+  username: string;
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+};
 export type TUserUpdateParams = Partial<
   Omit<User, "id" | "email" | "created_at">
 >;
@@ -465,6 +473,19 @@ export class RestApiError extends Error {
     super(message);
     this.reason = reason;
   }
+}
+
+export interface GraphQlContext {
+  req: Request;
+  res: Response;
+  services: {
+    dbClient: Knex;
+    stripeApi: IStripeApi;
+    emailApi: IMailService;
+    oAuthApi: IGoogleOAuthApi;
+    oAuthStoreApi: IGoogleAuthClientsStore;
+    googleCalendarApi: IGoogleCalendarApi | null;
+  };
 }
 
 /**
