@@ -80,7 +80,7 @@ const graphQlTypeDefs = `
   }
 
   type VisitorEventType implements EventType {
-    availableDates: AvailableDates!
+    availableDates(month: String!, timezone: String!): AvailableDates!
   }
 
   type UserEventType implements EventType {
@@ -108,16 +108,19 @@ const graphQlTypeDefs = `
     isActive: Boolean
     description: String
     location: EventTypeLocation
-    questions: [EventTypeQuestion!]
   }
 
   input EventTypeUpdatePaymentInput {
     collectsPayments: Boolean!
-    paymentFee: Boolean!
+    paymentFee: Float
   }
 
   input EventTypeUpdateScheduleInput {
     schedule: Schedule!
+  }
+
+  input EventTypeUpdateQuestionsInput {
+    questions: [EventTypeQuestion!]!
   }
 
   type EventAnswer {
@@ -195,7 +198,7 @@ const graphQlTypeDefs = `
   }
 
   type PaymentConnections {
-    pageInfo: PageInfo!
+    info: PageInfo!
     edges: [Payment!]!
   }
   
@@ -215,10 +218,10 @@ const graphQlTypeDefs = `
 
   type Query {
     me(): User!
-    viewBookingInformation(username: String!, eventTypeLink: String!, month: String!): VisitorEventType!
-    eventTypes(after: String = "", take: Int = 5, order: PaginationOrder = "ASC"): EventTypeConnections!
-    events(after: String = "", take: Int = 5, order: PaginationOrder = "ASC"): EventConnections!
-    payments(after: String = "", take: Int = 5, order: PaginationOrder = "ASC"): PaymentConnections!
+    viewBookingInformation(username: String!, eventTypeLink: String!): VisitorEventType!
+    eventTypes(after: String = "", take: Int = 5, order: PaginationOrder = "DESC"): EventTypeConnections!
+    events(after: String = "", take: Int = 5, order: PaginationOrder = "DESC"): EventConnections!
+    payments(after: String = "", take: Int = 5, order: PaginationOrder = "DESC"): PaymentConnections!
   }
 
   type Mutation {
@@ -228,9 +231,10 @@ const graphQlTypeDefs = `
     connectGoogleCalendar(): ConnectResponse!
     connectStripe(): ConnectResponse!
     createEventType(params: EventTypeCreateInput!): EventType!
-    updateEventType(params: EventTypeUpdateInput!): EventType!
-    updateEventTypeSchedule(params: EventTypeUpdateScheduleInput!): EventType!
-    toggleEventTypePayment(params: EventTypeUpdatePaymentInput!): EventType!
+    updateEventType(eventTypeId: String!, params: EventTypeUpdateInput!): EventType!
+    updateEventTypeQuestions(eventTypeId: String!, params: EventTypeUpdateQuestionsInput!): EventType!
+    updateEventTypeSchedule(eventTypeId: String!, params: EventTypeUpdateScheduleInput!): EventType!
+    updateEventTypePayment(eventTypeId: String!, params: EventTypeUpdatePaymentInput!): EventType!
     deleteEventType(eventTypeId: String!): ApiResponse!
     bookEvent(params: EventCreateInput!): ApiResponse!
     cancelEvent(eventId: String!): Event!
