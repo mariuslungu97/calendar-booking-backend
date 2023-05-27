@@ -8,6 +8,7 @@ import {
   TStripeCreateAccountParams,
   TStripeRetrieveAccountParams,
   TStripeCreateAccountLinkParams,
+  TStripeUpdatePriceAmountParams,
   TStripeCreateProductWithPriceParams,
   TStripeCreatePaymentSessionParams,
 } from "../types";
@@ -117,6 +118,26 @@ const createProductWithPrice = async (
   }
 };
 
+const updatePriceAmount = async (params: TStripeUpdatePriceAmountParams) => {
+  try {
+    const { accountId, priceId, unitPrice } = params;
+    const updatedPrice = await stripe.prices.update(
+      priceId,
+      {
+        currency_options: { usd: { unit_amount: unitPrice } },
+      },
+      { stripeAccount: accountId }
+    );
+    return updatedPrice;
+  } catch (err) {
+    logger.info(
+      "An error occured whilst trying update the price unit amount",
+      err
+    );
+    return null;
+  }
+};
+
 const createPaymentSession = async (
   params: TStripeCreatePaymentSessionParams
 ): Promise<Stripe.Checkout.Session | null> => {
@@ -152,6 +173,7 @@ const createPaymentSession = async (
 const stripeApi: IStripeApi = {
   createAccount,
   retrieveAccount,
+  updatePriceAmount,
   createAccountLink,
   createProductWithPrice,
   createPaymentSession,
