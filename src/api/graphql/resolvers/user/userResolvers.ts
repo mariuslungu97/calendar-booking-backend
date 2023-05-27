@@ -5,23 +5,25 @@ import Stripe from "stripe";
 
 import logger from "../../../../loaders/logger";
 
-import { userCreateValidationSchema } from "./userValidation";
+import {
+  userCreateValidationSchema,
+  userLoginValidationSchema,
+} from "./userValidation";
 import { isLoggedIn } from "../../../middleware/auth";
 
-import { User, GraphQlContext, TUserSessionData } from "../../../../types";
-
-interface UserCreateInputParams {
-  username: string;
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-}
-
-interface UserLoginParams {
-  email: string;
-  password: string;
-}
+import {
+  User,
+  Event,
+  EventType,
+  UserCreateInputParams,
+  UserLoginParams,
+  LoginResponse,
+  AccountCreateResponse,
+  ConnectionResponse,
+  Payment,
+  GraphQlContext,
+  TUserSessionData,
+} from "../../../../types";
 
 const userFields = {
   User: {
@@ -29,12 +31,16 @@ const userFields = {
     isVerified: (parent: User) => parent.is_email_verified,
     is2FaActivated: (parent: User) => parent.is_2fa_activated,
     createdAt: (parent: User) => parent.created_at,
-    upcomingEvents: async (parent: User, _: any, ctx: GraphQlContext) => {
+    upcomingEvents: async (
+      parent: User,
+      _: any,
+      ctx: GraphQlContext
+    ): Promise<Event[]> => {
       try {
         const { id } = parent;
         const { dbClient } = ctx.services;
 
-        const upcomingEvents = await dbClient("events")
+        const upcomingEvents = (await dbClient("events")
           .select("events.*")
           .leftJoin(
             "event_schedules",
@@ -45,7 +51,7 @@ const userFields = {
           .where("user_id", id)
           .andWhere("start_date_time", ">", Math.floor(Date.now() / 1000))
           .orderBy("start_date_time", "asc")
-          .limit(3);
+          .limit(3)) as Event[];
 
         return upcomingEvents;
       } catch (err) {
@@ -55,7 +61,11 @@ const userFields = {
         );
       }
     },
-    recentEventTypes: async (parent: User, _: any, ctx: GraphQlContext) => {
+    recentEventTypes: async (
+      parent: User,
+      _: any,
+      ctx: GraphQlContext
+    ): Promise<EventType[]> => {
       try {
         const { id } = parent;
         const { dbClient } = ctx.services;
@@ -74,7 +84,11 @@ const userFields = {
         );
       }
     },
-    recentPayments: async (parent: User, _: any, ctx: GraphQlContext) => {
+    recentPayments: async (
+      parent: User,
+      _: any,
+      ctx: GraphQlContext
+    ): Promise<Payment[]> => {
       try {
         const { id } = parent;
         const { dbClient } = ctx.services;
@@ -97,7 +111,7 @@ const userFields = {
 };
 
 const userQueries = {
-  me: async (_: any, __: any, ctx: GraphQlContext) => {
+  me: async (_: any, __: any, ctx: GraphQlContext): Promise<User> => {
     const { req } = ctx;
     const { dbClient } = ctx.services;
     if (!isLoggedIn(req)) throw new GraphQLError("You are not authenticated!");
@@ -109,7 +123,8 @@ const userQueries = {
       if (!userList.length)
         throw new GraphQLError("Unexpected error trying to retrieve user!");
 
-      return userList[0];
+      const user = userList[0];
+      return user;
     } catch (err) {
       logger.error("Me Resolver Error: ", err);
       throw new GraphQLError("Unexpected error trying to retrieve user!");
@@ -122,7 +137,7 @@ const userMutations = {
     _: any,
     params: UserCreateInputParams,
     ctx: GraphQlContext
-  ) => {
+  ): Promise<AccountCreateResponse> => {
     try {
       await userCreateValidationSchema.validateAsync(params);
 
@@ -166,10 +181,16 @@ const userMutations = {
       throw new GraphQLError("Unexpected error trying to create account");
     }
   },
-  login: async (_: any, params: UserLoginParams, ctx: GraphQlContext) => {
+  login: async (
+    _: any,
+    params: UserLoginParams,
+    ctx: GraphQlContext
+  ): Promise<LoginResponse> => {
     try {
       const { req } = ctx;
       const { dbClient, emailApi } = ctx.services;
+
+      await userLoginValidationSchema.validateAsync(params);
       const { email, password } = params;
 
       const loggedAccountList = await dbClient("users").where("email", email);
@@ -222,7 +243,7 @@ const userMutations = {
       throw new GraphQLError("Unexpected error trying to login into account");
     }
   },
-  activate2Fa: async (_: any, __: any, ctx: GraphQlContext) => {
+  activate2Fa: async (_: any, __: any, ctx: GraphQlContext): Promise<User> => {
     const { req } = ctx;
     const { dbClient } = ctx.services;
 
@@ -247,7 +268,11 @@ const userMutations = {
       );
     }
   },
-  connectGoogleCalendar: async (_: any, __: any, ctx: GraphQlContext) => {
+  connectGoogleCalendar: async (
+    _: any,
+    __: any,
+    ctx: GraphQlContext
+  ): Promise<ConnectionResponse> => {
     const { req } = ctx;
     const { oAuthApi } = ctx.services;
 
@@ -267,7 +292,11 @@ const userMutations = {
       redirect: authUrl,
     };
   },
-  connectStripe: async (_: any, __: any, ctx: GraphQlContext) => {
+  connectStripe: async (
+    _: any,
+    __: any,
+    ctx: GraphQlContext
+  ): Promise<ConnectionResponse> => {
     const { req } = ctx;
     const { dbClient, stripeApi } = ctx.services;
 

@@ -55,7 +55,7 @@ export interface SchedulePeriod {
   start_time: string;
   end_time: string;
 }
-export type TSchedulePeriodCreateInput = SchedulePeriod;
+export type TSchedulePeriodCreateInput = Omit<SchedulePeriod, "id">;
 export type TSchedulePeriodUpdateParams = Partial<
   Omit<SchedulePeriod, "id" | "schedule_id">
 >;
@@ -86,14 +86,16 @@ export interface EventType {
   location: TEventTypeLocationType;
   description?: string | null;
   payment_fee?: number | null;
-  location_phone_number?: string | null;
-  location_address?: string | null;
+  location_value?: string | null;
   stripe_product_id?: string | null;
   stripe_price_id?: string | null;
   created_at: string;
   updated_at: string;
 }
-export type TEventTypeCreateInput = Omit<EventType, "id" | "created_at">;
+export type TEventTypeCreateInput = Omit<
+  EventType,
+  "id" | "created_at" | "updated_at" | "is_active"
+>;
 export type TEventTypeUpdateParams = Partial<
   Omit<EventType, "id" | "user_id" | "created_at">
 >;
@@ -360,6 +362,12 @@ export type TStripeCreateProductWithPriceParams = {
   unitPrice: number;
 };
 
+export type TStripeUpdatePriceAmountParams = {
+  accountId: string;
+  priceId: string;
+  unitPrice: number;
+};
+
 export type TStripeCreatePaymentSessionParams = {
   accountId: string;
   priceId: string;
@@ -385,6 +393,9 @@ export interface IStripeApi {
   ) => Promise<Stripe.AccountLink | null>;
   createProductWithPrice: (
     params: TStripeCreateProductWithPriceParams
+  ) => Promise<Stripe.Price | null>;
+  updatePriceAmount: (
+    params: TStripeUpdatePriceAmountParams
   ) => Promise<Stripe.Price | null>;
   createPaymentSession: (
     params: TStripeCreatePaymentSessionParams
@@ -489,6 +500,104 @@ export interface GraphQlContext {
 }
 
 /**
+ * GraphQL API
+ */
+
+type TPaginationOrder = "ASC" | "DESC";
+export interface PageInfo {
+  nextPage: string | null;
+  previousPage: string | null;
+  take: number;
+  order: TPaginationOrder;
+}
+
+export interface CursorPaginationParams {
+  cursor: string;
+  order: TPaginationOrder;
+  take: number;
+}
+
+export interface EventTypeConnections {
+  info: PageInfo;
+  edges: EventType[];
+}
+
+export interface LocationQl {
+  type: TEventTypeLocationType;
+  value: string | null;
+}
+
+// Event Type Resolvers
+
+export interface AvailableTimeSlot {
+  startTime: string;
+  endTime: string;
+}
+
+export interface AvailableDate {
+  date: string;
+  times: AvailableTimeSlot[];
+}
+
+export interface AvailableDates {
+  month: string;
+  timezone: string;
+  dates: AvailableDate[];
+}
+
+export interface AvailableDatesParams {
+  month: string;
+  timezone: string;
+}
+
+export interface SchedulePeriodQl {
+  day: number;
+  startTime: string;
+  endTime: string;
+}
+
+export interface ScheduleQl {
+  timezone: string;
+  periods: SchedulePeriodQl[];
+}
+
+export interface QuestionQl {
+  type: string;
+  label: string;
+  isOptional: boolean;
+  possibleAnswers: string[] | null;
+}
+
+// User Resolvers
+
+export interface UserCreateInputParams {
+  username: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface UserLoginParams {
+  email: string;
+  password: string;
+}
+
+export interface AccountCreateResponse {
+  message: string;
+}
+
+export interface ConnectionResponse {
+  message: string;
+  redirect: string;
+}
+
+export interface LoginResponse {
+  message: string;
+  is2FaActivated: boolean;
+}
+
+/**
  * ==========================
  * ========= MISC ===========
  * ==========================
@@ -512,15 +621,4 @@ export interface ReducedSchedule {
   id: string;
   timezone: string;
   periods: ReducedPeriod[];
-}
-
-export interface DateSlots {
-  date: string;
-  slots: TTimeSlotString[];
-}
-
-export interface MonthSlots {
-  month: string;
-  timezone: string;
-  dates: DateSlots[];
 }
