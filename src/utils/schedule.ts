@@ -258,7 +258,8 @@ const dayTimeToDate = (day: number, time: string, tz: string): Dayjs => {
   return dateLocal;
 };
 
-const tzSwap = (date: Dayjs, newTz: string) => date.tz(newTz);
+const dateInTimezone = (date: Dayjs, tz: string) => dayjs.tz(date, tz);
+const dateToTimezone = (date: Dayjs, tz: string) => date.tz(tz);
 
 export {
   getAvailableTimeSlots,
@@ -267,5 +268,6 @@ export {
   getDateStartEnd,
   convertDayTime,
   dayTimeToDate,
-  tzSwap,
+  dateInTimezone,
+  dateToTimezone,
 };

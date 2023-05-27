@@ -1,12 +1,6 @@
 import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-import timezone from "dayjs/plugin/timezone";
-
 import logger from "../loaders/logger";
 import knexClient from "../loaders/knex";
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 import {
   getAvailableTimeSlots,
@@ -14,15 +8,17 @@ import {
   getMonthStartEnd,
   getDateStartEnd,
   dayTimeToDate,
-  tzSwap,
+  dateInTimezone,
+  dateToTimezone,
 } from "./schedule";
 
 import {
   TTimeSlotString,
   ScheduleWithPeriods,
   EventType,
-  MonthSlots,
-  DateSlots,
+  AvailableDates,
+  AvailableDate,
+  AvailableTimeSlot,
   SchedulePeriod,
   ReducedPeriod,
   TDayjsSlot,
@@ -36,11 +32,11 @@ const convertSchedulePeriodsToTz = (
   const newPeriods: ReducedPeriod[] = [];
 
   for (const period of periods) {
-    const dateConvertStart = tzSwap(
+    const dateConvertStart = dateToTimezone(
       dayTimeToDate(period.day, period.start_time, tz),
       newTz
     );
-    const dateConvertEnd = tzSwap(
+    const dateConvertEnd = dateToTimezone(
       dayTimeToDate(period.day, period.end_time, tz),
       newTz
     );
@@ -105,9 +101,9 @@ const retrieveMonthSlots = async (
   eventType: EventType,
   month: string,
   timezone: string
-): Promise<MonthSlots | null> => {
+): Promise<AvailableDates | null> => {
   try {
-    const monthSlots: MonthSlots = { month, timezone, dates: [] };
+    const monthSlots: AvailableDates = { month, timezone, dates: [] };
 
     const scheduleWithPeriods = await retrieveUserScheduleWithPeriods(
       eventType.schedule_id
@@ -124,10 +120,24 @@ const retrieveMonthSlots = async (
       timezone
     );
 
+    const visitorCurrentDate = dateToTimezone(dayjs(), timezone);
+
     // grab all calendar events within given month in UTC
     const [monthStart, monthEnd] = getMonthStartEnd(month);
-    const monthStartUtc = dayjs.tz(monthStart, timezone).tz("Etc/UTC");
-    const monthEndUtc = dayjs.tz(monthEnd, timezone).tz("Etc/UTC");
+    const monthStartUtc = dateToTimezone(
+      dateInTimezone(monthStart, timezone),
+      "Etc/UTC"
+    );
+    const monthEndUtc = dateToTimezone(
+      dateInTimezone(monthEnd, timezone),
+      "Etc/UTC"
+    );
+
+    // avoid retrieving events in the past
+    const eventsStartDate =
+      visitorCurrentDate.month() === monthStart.month()
+        ? dateToTimezone(visitorCurrentDate, "Etc/UTC")
+        : monthStartUtc;
 
     const calendarEvents = await knexClient("calendar_events")
       .select("*")
@@ -136,31 +146,50 @@ const retrieveMonthSlots = async (
         "calendar_events.schedule_id",
         "event_schedules.id"
       )
-      .where("event_schedules.end_date_time", ">", monthStartUtc.unix())
+      .where("event_schedules.end_date_time", ">", eventsStartDate.unix())
       .where("event_schedules.end_date_time", "<", monthEndUtc.unix());
 
     // convert calendar events to visitor's timezone
     const tzCalendarEvents = calendarEvents.map((event) => ({
       ...event,
-      start_date_time: dayjs(event.start_date_time).tz(timezone),
-      end_date_time: dayjs(event.end_date_time).tz(timezone),
+      start_date_time: dateToTimezone(event.start_date_time, timezone),
+      end_date_time: dateToTimezone(event.end_date_time, timezone),
     }));
 
     // compute available events for each day of the month
     const daysInMonth = monthStart.daysInMonth();
     for (let day = 1; day <= daysInMonth; day++) {
       const dateInMonth = monthStart.clone().date(day);
-      const dateSlots: DateSlots = {
+      const dateSlots: AvailableDate = {
         date: dateInMonth.format("DD-MM-YYYY"),
-        slots: [],
+        times: [],
       };
 
-      const schedule = tzPeriods
+      // skip previous days if we're attempting to retrieve slots in current month
+      if (
+        visitorCurrentDate.month() === monthStart.month() &&
+        day < visitorCurrentDate.date()
+      ) {
+        monthSlots.dates.push(dateSlots);
+        continue;
+      }
+
+      let schedule = tzPeriods
         .filter((tzPeriod) => tzPeriod.day === dateInMonth.day())
         .map((tzPeriod) => [
           tzPeriod.start_time.date(dateInMonth.date()),
           tzPeriod.end_time.date(dateInMonth.date()),
         ]) as TDayjsSlot[];
+
+      // skip previous schedules if we're attempting to retrieve slots in same day
+      if (
+        visitorCurrentDate.month() === monthStart.month() &&
+        day === visitorCurrentDate.date()
+      ) {
+        schedule = schedule.filter((tzPeriod) =>
+          tzPeriod[0].isSameOrAfter(visitorCurrentDate)
+        );
+      }
 
       if (!schedule.length) {
         monthSlots.dates.push(dateSlots);
@@ -188,10 +217,11 @@ const retrieveMonthSlots = async (
         eventType.duration
       );
 
-      dateSlots.slots.push(
-        ...(availableSlots.map((avSlot) =>
-          avSlot.toString()
-        ) as TTimeSlotString[])
+      dateSlots.times.push(
+        ...(availableSlots.map((avSlot) => ({
+          startTime: avSlot.from.format("HH:mm"),
+          endTime: avSlot.to.format("HH:mm"),
+        })) as AvailableTimeSlot[])
       );
       monthSlots.dates.push(dateSlots);
     }
@@ -228,10 +258,10 @@ const isSlotValid = async (
       timezone
     );
 
-    const dateStart = dayjs.tz(timeSlot[0], timezone);
-    const dateEnd = dayjs.tz(timeSlot[1], timezone);
-    const dateStartUtc = tzSwap(dateStart, "Etc/UTC");
-    const dateEndUtc = tzSwap(dateEnd, "Etc/UTC");
+    const dateStart = dateInTimezone(dayjs(timeSlot[0]), timezone);
+    const dateEnd = dateInTimezone(dayjs(timeSlot[1]), timezone);
+    const dateStartUtc = dateToTimezone(dateStart, "Etc/UTC");
+    const dateEndUtc = dateToTimezone(dateEnd, "Etc/UTC");
 
     const calendarEvents = await knexClient("calendar_events")
       .select("*")
@@ -249,13 +279,13 @@ const isSlotValid = async (
           tzPeriod.day === dateStart.day() || tzPeriod.day === dateEnd.day()
       )
       .map((tzPeriod) => [
-        dayjs.tz(tzPeriod.start_time, timezone).day(tzPeriod.day),
-        dayjs.tz(tzPeriod.end_time, timezone).day(tzPeriod.day),
+        dateInTimezone(tzPeriod.start_time, timezone).day(tzPeriod.day),
+        dateInTimezone(tzPeriod.end_time, timezone).day(tzPeriod.day),
       ]) as TDayjsSlot[];
 
     const bookedSlots = calendarEvents.map((event) => [
-      dayjs(event.start_date_time).tz(timezone),
-      dayjs(event.end_date_time).tz(timezone),
+      dateToTimezone(event.start_date_time, timezone),
+      dateToTimezone(event.end_date_time, timezone),
     ]) as TDayjsSlot[];
 
     const isAvailable = isTimeSlotAvailable(schedule, bookedSlots, [
