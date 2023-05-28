@@ -26,7 +26,7 @@ const stripe = new Stripe(apiKey, { apiVersion: "2022-11-15" });
 
 const createAccount = async (
   params: TStripeCreateAccountParams
-): Promise<Stripe.Account | null> => {
+): Promise<Stripe.Account> => {
   try {
     const { firstName, lastName, email } = params;
     const newAccount: Stripe.Account = await stripe.accounts.create({
@@ -48,33 +48,27 @@ const createAccount = async (
     });
     return newAccount;
   } catch (err) {
-    logger.info(
-      "An error occured whilst trying to create a stripe account!",
-      err
-    );
-    return null;
+    logger.info("An error occured whilst trying to create a stripe account!");
+    throw err;
   }
 };
 
 const retrieveAccount = async (
   params: TStripeRetrieveAccountParams
-): Promise<Stripe.Account | null> => {
+): Promise<Stripe.Account> => {
   try {
     const { accountId } = params;
     const account = await stripe.accounts.retrieve(accountId);
     return account;
   } catch (err) {
-    logger.info(
-      "An error occured whilst trying retrieve a stripe account!",
-      err
-    );
-    return null;
+    logger.info("An error occured whilst trying retrieve a stripe account!");
+    throw err;
   }
 };
 
 const createAccountLink = async (
   params: TStripeCreateAccountLinkParams
-): Promise<Stripe.AccountLink | null> => {
+): Promise<Stripe.AccountLink> => {
   try {
     const { accountId } = params;
     const link: Stripe.AccountLink = await stripe.accountLinks.create({
@@ -85,17 +79,14 @@ const createAccountLink = async (
     });
     return link;
   } catch (err) {
-    logger.info(
-      "An error occured whilst trying to create an account link!",
-      err
-    );
-    return null;
+    logger.info("An error occured whilst trying to create an account link!");
+    throw err;
   }
 };
 
 const createProductWithPrice = async (
   params: TStripeCreateProductWithPriceParams
-): Promise<Stripe.Price | null> => {
+): Promise<Stripe.Price> => {
   try {
     const { accountId, productName, unitPrice } = params;
     const productAndPrice = await stripe.prices.create(
@@ -111,10 +102,9 @@ const createProductWithPrice = async (
     return productAndPrice;
   } catch (err) {
     logger.info(
-      "An error occured whilst trying to create a product with an associated price!",
-      err
+      "An error occured whilst trying to create a product with an associated price!"
     );
-    return null;
+    throw err;
   }
 };
 
@@ -130,17 +120,14 @@ const updatePriceAmount = async (params: TStripeUpdatePriceAmountParams) => {
     );
     return updatedPrice;
   } catch (err) {
-    logger.info(
-      "An error occured whilst trying update the price unit amount",
-      err
-    );
-    return null;
+    logger.info("An error occured whilst trying update the price unit amount");
+    throw err;
   }
 };
 
 const createPaymentSession = async (
   params: TStripeCreatePaymentSessionParams
-): Promise<Stripe.Checkout.Session | null> => {
+): Promise<Stripe.Checkout.Session> => {
   try {
     const { accountId, priceId, eventId, shopperEmail, applicationFee } =
       params;
@@ -165,8 +152,8 @@ const createPaymentSession = async (
     });
     return paymentSession;
   } catch (err) {
-    logger.info("An error occured whilst trying to a payment session!", err);
-    return null;
+    logger.info("An error occured whilst trying to a payment session!");
+    throw err;
   }
 };
 
