@@ -5,39 +5,70 @@ export async function up(knex: Knex): Promise<void> {
     .raw('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
     .then(() => {
       return knex.schema
-        .hasTable("users")
+        .hasTable("stripe_accounts")
         .then((exists) => {
           if (!exists) {
-            return knex.schema.createTable("users", (table) => {
+            return knex.schema.createTable("stripe_accounts", (table) => {
+              table.string("id").primary(); // equal to stripe_account_id
+
+              table.boolean("details_submitted").defaultTo(false).notNullable();
+              table.boolean("charges_enabled").defaultTo(false).notNullable();
               table
-                .uuid("id")
-                .primary()
-                .defaultTo(knex.raw("uuid_generate_v4()"));
-              table
-                .string("username")
-                .notNullable()
-                .unique()
-                .checkLength("<=", 50);
+                .boolean("capabilities_enabled")
+                .defaultTo(false)
+                .notNullable();
 
-              table.string("email").notNullable().unique();
-              table.string("password").notNullable();
-
-              table.string("first_name").notNullable();
-              table.string("last_name").notNullable();
-
-              table.boolean("is_email_verified").notNullable().defaultTo(false);
-              table.boolean("is_2fa_activated").notNullable().defaultTo(false);
-
-              table.boolean("is_deleted").notNullable().defaultTo(false);
-              table.timestamp("deleted_at");
-
-              table.string("calendar_sync_token");
-              table.string("stripe_account_id");
-
-              table.timestamp("created_at").defaultTo(knex.fn.now());
+              table.timestamps(true, true);
             });
           }
           return;
+        })
+        .then(() => {
+          return knex.schema.hasTable("users").then((exists) => {
+            if (!exists) {
+              return knex.schema.createTable("users", (table) => {
+                table
+                  .uuid("id")
+                  .primary()
+                  .defaultTo(knex.raw("uuid_generate_v4()"));
+                table
+                  .string("username")
+                  .unique()
+                  .checkLength("<=", 50)
+                  .notNullable();
+
+                table.string("stripe_account_id");
+                table
+                  .foreign("stripe_account_id")
+                  .references("id")
+                  .inTable("stripe_accounts")
+                  .onDelete("SET NULL");
+
+                table.string("email").notNullable().unique();
+                table.string("password").notNullable();
+
+                table.string("first_name").notNullable();
+                table.string("last_name").notNullable();
+
+                table
+                  .boolean("is_email_verified")
+                  .notNullable()
+                  .defaultTo(false);
+                table
+                  .boolean("is_2fa_activated")
+                  .notNullable()
+                  .defaultTo(false);
+
+                table.boolean("is_deleted").notNullable().defaultTo(false);
+                table.timestamp("deleted_at");
+
+                table.string("calendar_sync_token");
+
+                table.timestamp("created_at").defaultTo(knex.fn.now());
+              });
+            }
+            return;
+          });
         })
         .then(() => {
           return knex.schema.hasTable("oauth_connections").then((exists) => {

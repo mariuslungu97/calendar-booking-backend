@@ -1,6 +1,7 @@
 import { Knex } from "knex";
 
 import {
+  StripeAccount,
   User,
   OAuthConnection,
   Schedule,
@@ -25,6 +26,8 @@ import {
   TEventUpdateParams,
   TUserCreateInput,
   TUserUpdateParams,
+  TStripeAccountCreateInput,
+  TStripeAccountUpdateParams,
   TOAuthConnectionCreateInput,
   TOAuthConnectionUpdateParams,
   TScheduleCreateInput,
@@ -42,6 +45,12 @@ import {
 declare module "knex/types/tables" {
   interface Tables {
     users: Knex.CompositeTableType<User, TUserCreateInput, TUserUpdateParams>;
+
+    stripe_accounts: Knex.CompositeTableType<
+      StripeAccount,
+      TStripeAccountCreateInput,
+      TStripeAccountUpdateParams
+    >;
 
     oauth_connections: Knex.CompositeTableType<
       OAuthConnection,

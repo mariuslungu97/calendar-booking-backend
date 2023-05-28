@@ -14,6 +14,22 @@ export type TUserSessionData = { id: string; email: string };
  * ==========================
  */
 
+export interface StripeAccount {
+  id: string;
+  details_submitted: boolean;
+  charges_enabled: boolean;
+  capabilities_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export type TStripeAccountCreateInput = {
+  id: string;
+};
+export type TStripeAccountUpdateParams = Omit<
+  StripeAccount,
+  "id" | "created_at"
+>;
+
 export interface User {
   id: string;
   username: string;
