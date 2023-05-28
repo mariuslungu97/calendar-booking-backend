@@ -533,11 +533,6 @@ export interface CursorPaginationParams {
   take: number;
 }
 
-export interface EventTypeConnections {
-  info: PageInfo;
-  edges: EventType[];
-}
-
 export interface LocationQl {
   type: TEventTypeLocationType;
   value: string | null;
@@ -559,29 +554,6 @@ export interface AvailableDates {
   month: string;
   timezone: string;
   dates: AvailableDate[];
-}
-
-export interface AvailableDatesParams {
-  month: string;
-  timezone: string;
-}
-
-export interface SchedulePeriodQl {
-  day: number;
-  startTime: string;
-  endTime: string;
-}
-
-export interface ScheduleQl {
-  timezone: string;
-  periods: SchedulePeriodQl[];
-}
-
-export interface QuestionQl {
-  type: string;
-  label: string;
-  isOptional: boolean;
-  possibleAnswers: string[] | null;
 }
 
 /**

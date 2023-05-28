@@ -100,11 +100,11 @@ const retrieveUserScheduleWithPeriods = async (
   }
 };
 
-const retrieveMonthSlots = async (
+const retrieveAvailableSlots = async (
   eventType: EventType,
   month: string,
   timezone: string
-): Promise<AvailableDates | null> => {
+): Promise<AvailableDates> => {
   try {
     const monthSlots: AvailableDates = { month, timezone, dates: [] };
 
@@ -232,14 +232,13 @@ const retrieveMonthSlots = async (
     return monthSlots;
   } catch (err) {
     logger.error(
-      "Unexpected error trying to retrieve available date times by month!",
-      err
+      "Unexpected error trying to retrieve available date times by month!"
     );
-    return null;
+    throw err;
   }
 };
 
-const isSlotValid = async (
+const isTimeSlotValid = async (
   eventType: EventType,
   timeSlot: TTimeSlotString,
   timezone: string
@@ -299,10 +298,9 @@ const isSlotValid = async (
     return isAvailable;
   } catch (err) {
     logger.error(
-      "Unexpected error trying to retrieve available date times by month!",
-      err
+      "Unexpected error trying to determine if a time slot is valid for booking!"
     );
-    return false;
+    throw err;
   }
 };
 
@@ -330,4 +328,4 @@ const handleGraphqlError = (error: any, info: TErrorInfo): never => {
   throw new GraphQLError(clientErrorMessage);
 };
 
-export { retrieveMonthSlots, isSlotValid, handleGraphqlError };
+export { retrieveAvailableSlots, isTimeSlotValid, handleGraphqlError };

@@ -216,6 +216,10 @@ const graphQlTypeDefs = `
     redirect: String!
   }
 
+  type BookEventResponse {
+    message: string!
+  }
+
   type Query {
     me(): User!
     viewBookingInformation(username: String!, eventTypeLink: String!): VisitorEventType!
@@ -235,8 +239,8 @@ const graphQlTypeDefs = `
     updateEventTypeQuestions(eventTypeId: String!, params: EventTypeUpdateQuestionsInput!): EventType!
     updateEventTypeSchedule(eventTypeId: String!, params: EventTypeUpdateScheduleInput!): EventType!
     updateEventTypePayment(eventTypeId: String!, params: EventTypeUpdatePaymentInput!): EventType!
-    deleteEventType(eventTypeId: String!): ApiResponse!
-    bookEvent(params: EventCreateInput!): ApiResponse!
+    deleteEventType(eventTypeId: String!): EventType!
+    bookEvent(params: EventCreateInput!): BookEventResponse!
     cancelEvent(eventId: String!): Event!
     deleteEvent(eventId: String!): Event!
   }

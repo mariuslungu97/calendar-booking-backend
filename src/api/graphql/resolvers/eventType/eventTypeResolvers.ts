@@ -1,10 +1,10 @@
 import { GraphQLError } from "graphql";
-import { ValidationError } from "joi";
 import dayjs from "dayjs";
 
-import logger from "../../../../loaders/logger";
-
-import { retrieveMonthSlots } from "../../../../utils/api";
+import {
+  retrieveAvailableSlots,
+  handleGraphqlError,
+} from "../../../../utils/api";
 import { dateToTimezone } from "../../../../utils/schedule";
 import {
   availableDatesParamsValidationSchema,
@@ -17,65 +17,96 @@ import {
 
 import {
   EventType,
-  ScheduleQl,
-  AvailableDatesParams,
-  QuestionQl,
   PageInfo,
-  EventTypeConnections,
+  AvailableDates,
   CursorPaginationParams,
   GraphQlContext,
-  AvailableDates,
   TUserSessionData,
-  SchedulePeriodQl,
-  LocationQl,
   TEventTypeQuestionType,
+  TEventTypeLocationType,
 } from "../../../../types";
 import { isLoggedIn } from "../../../middleware/auth";
 
-interface EventTypeCreateInputParams {
+interface Question {
+  type: TEventTypeQuestionType;
+  isOptional: boolean;
+  label: string;
+  possibleAnswers: string[] | null;
+}
+
+interface Location {
+  type: TEventTypeLocationType;
+  value: string | null;
+}
+
+interface SchedulePeriod {
+  day: number;
+  startTime: string;
+  endTime: string;
+}
+
+interface Schedule {
+  timezone: string;
+  periods: SchedulePeriod[];
+}
+
+interface AvailableDatesParams {
+  month: string;
+  timezone: string;
+}
+
+interface EventTypeConnections {
+  pageInfo: PageInfo;
+  edges: EventType[];
+}
+
+interface ViewBookingInformationParams {
+  username: string;
+  eventTypeLink: string;
+}
+
+interface CreateEventTypeInputParams {
   name: string;
   link: string;
   duration: number;
   collectsPayments: boolean;
   description?: string;
   paymentFee?: number;
-  questions: QuestionQl[];
-  schedule: ScheduleQl;
-  location: LocationQl;
+  schedule: Schedule;
+  location: Location;
+  questions: Question[];
 }
 
-interface EventTypeUpdateInputParams {
+interface UpdateEventTypeParams {
   eventTypeId: string;
   params: {
     name?: string;
     duration?: number;
     description?: string;
     isActive?: boolean;
-    location?: LocationQl;
+    location?: Location;
   };
 }
 
-interface EventTypeDeleteParams {
+interface DeleteEventTypeParams {
   eventTypeId: string;
 }
 
-interface EventTypeScheduleUpdateParams {
+interface UpdateEventTypeScheduleParams {
   eventTypeId: string;
-  params: { schedule: ScheduleQl };
+  params: { schedule: Schedule };
 }
 
-interface EventTypeUpdatePaymentParams {
+interface UpdateEventTypeQuestionsParams {
+  eventTypeId: string;
+  params: { questions: Question[] };
+}
+
+interface UpdateEventTypePaymentParams {
   eventTypeId: string;
   params: {
     collectsPayments: boolean;
     paymentFee?: number;
-  };
-}
-
-interface EventTypeUpdateQuestionsParams {
-  eventTypeId: string;
-  params: {
-    questions: QuestionQl[];
   };
 }
 
@@ -86,7 +117,7 @@ const commonEventTypeFields = {
     parent: EventType,
     _: any,
     ctx: GraphQlContext
-  ): Promise<QuestionQl[]> => {
+  ): Promise<Question[]> => {
     try {
       const { dbClient } = ctx.services;
       const { id } = parent;
@@ -102,29 +133,26 @@ const commonEventTypeFields = {
         .select("*")
         .whereIn("question_id", questionIds);
 
-      const questionsWithAnswers: QuestionQl[] = questions.map((question) => {
-        const answerValues = [];
-        for (const answer of possibleAnswers) {
-          if (question.type === "TEXT") break;
-
-          if (answer.question_id === question.id)
-            answerValues.push(answer.value);
-        }
+      const questionsWithAnswers: Question[] = questions.map((question) => {
+        const questionPossibleAnswers = possibleAnswers
+          .filter((answer) => answer.question_id === question.id)
+          .map((question) => question.value);
 
         return {
           type: question.type,
           label: question.label,
           isOptional: question.is_optional,
-          possibleAnswers: question.type === "TEXT" ? null : answerValues,
+          possibleAnswers:
+            question.type === "TEXT" ? null : questionPossibleAnswers,
         };
       });
 
       return questionsWithAnswers;
     } catch (err) {
-      logger.error("Questions Event Type Resolver Error: ", err);
-      throw new GraphQLError(
-        "Unexpected error trying to retrieve event type questions!"
-      );
+      return handleGraphqlError(err, {
+        server: "EventType.questions resolver error",
+        client: "Unexpected error trying to retrieve event's type questions!",
+      });
     }
   },
 };
@@ -158,43 +186,27 @@ const eventTypeFields = {
         const { dbClient } = ctx.services;
         const { id } = parent;
 
-        const eventTypeList = await dbClient("event_types").where("id", id);
-        if (!eventTypeList.length)
-          throw new GraphQLError(
-            "Unexpected error trying to retrieve event type's available dates!"
-          );
+        const eventType = (await dbClient("event_types").where("id", id))[0];
 
-        const availableDates = await retrieveMonthSlots(
-          eventTypeList[0],
+        const availableDates = await retrieveAvailableSlots(
+          eventType,
           month,
           timezone
         );
-        if (!availableDates)
-          throw new GraphQLError(
-            "Unexpected error trying to retrieve event type's available dates!"
-          );
-
         return availableDates;
       } catch (err) {
-        if (err instanceof ValidationError) {
-          const { details } = err;
-          const messages = details.reduce(
-            (prev, detail) => (prev += detail.message + " "),
-            ""
-          );
-          throw new GraphQLError(messages);
-        }
-        logger.error("Event Type Available Dates Resolver Error: ", err);
-        throw new GraphQLError(
-          "Unexpected error trying to retrieve event type's available dates!"
-        );
+        return handleGraphqlError(err, {
+          server: "VisitorEventType.availableDates resolver error",
+          client:
+            "Unexpected error trying to retrieve event's type available dates!",
+        });
       }
     },
   },
-  EventType: {
+  UserEventType: {
     ...commonEventTypeFields,
     isActive: (parent: EventType) => parent.is_active,
-    location: (parent: EventType): LocationQl => ({
+    location: (parent: EventType): Location => ({
       type: parent.location,
       value: parent.location_value || null,
     }),
@@ -202,7 +214,7 @@ const eventTypeFields = {
       parent: EventType,
       _: any,
       ctx: GraphQlContext
-    ): Promise<ScheduleQl> => {
+    ): Promise<Schedule> => {
       try {
         const { dbClient } = ctx.services;
 
@@ -217,7 +229,7 @@ const eventTypeFields = {
           eventSchedule.id
         );
 
-        const scheduleWithPeriods: ScheduleQl = {
+        const scheduleWithPeriods: Schedule = {
           timezone: eventSchedule.timezone,
           periods: eventSchedulePeriods.map(
             (period) =>
@@ -225,16 +237,16 @@ const eventTypeFields = {
                 day: period.day,
                 startTime: period.start_time,
                 endTime: period.end_time,
-              } as SchedulePeriodQl)
+              } as SchedulePeriod)
           ),
         };
 
         return scheduleWithPeriods;
       } catch (err) {
-        logger.error("Event Type Schedule Resolver Error: ", err);
-        throw new GraphQLError(
-          "Unexpected error trying to retrieve event type's schedule!"
-        );
+        return handleGraphqlError(err, {
+          client: "Unexpected error trying to retrieve event's type schedule!",
+          server: "UserEventType.schedule resolver error",
+        });
       }
     },
   },
@@ -257,8 +269,8 @@ const eventTypeQueries = {
 
       const decodedCursor = Buffer.from(cursor, "base64").toString("ascii");
       const isNext = decodedCursor.split("__")[0];
-      const operator = isNext ? ">" : "<";
       const timestamp = decodedCursor.split("__")[1];
+      const operator = isNext ? "<" : ">";
       // reverse orders if we're going back
       const updatedOrder = isNext ? order : order === "DESC" ? "ASC" : "DESC";
       const eventTypes = await dbClient("event_types")
@@ -269,7 +281,7 @@ const eventTypeQueries = {
 
       if (!eventTypes.length)
         return {
-          info: { nextPage: null, previousPage: null, order, take },
+          pageInfo: { nextPage: null, previousPage: null, order, take },
           edges: [],
         };
 
@@ -305,14 +317,46 @@ const eventTypeQueries = {
       };
 
       return {
-        info: pageInfo,
+        pageInfo: pageInfo,
         edges: eventTypes,
       };
     } catch (err) {
-      logger.error("Event Types Resolver Error: ", err);
-      throw new GraphQLError(
-        "Unexpected error trying to retrieve event types "
-      );
+      return handleGraphqlError(err, {
+        server: "EventType.eventTypes resolver error",
+        client: "Unexpected error trying to retrieve event types!",
+      });
+    }
+  },
+  viewBookingInformation: async (
+    _: any,
+    params: ViewBookingInformationParams,
+    ctx: GraphQlContext
+  ) => {
+    try {
+      const { dbClient } = ctx.services;
+      const { username, eventTypeLink } = params;
+
+      const userList = await dbClient("users")
+        .select("id")
+        .where("username", username);
+      if (!userList.length)
+        throw new GraphQLError("The requested event type couldn't be found!");
+
+      const user = userList[0];
+      const eventTypeList = await dbClient("event_types")
+        .select("*")
+        .where("user_id", user.id)
+        .andWhere("link", eventTypeLink);
+      if (!eventTypeList.length)
+        throw new GraphQLError("The requested event type couldn't be found!");
+
+      return eventTypeList[0];
+    } catch (err) {
+      return handleGraphqlError(err, {
+        server: "EventType.viewBookingInformation resolver error",
+        client:
+          "Unexpected error trying to retrieve an event type booking information!",
+      });
     }
   },
 };
@@ -320,7 +364,7 @@ const eventTypeQueries = {
 const eventTypeMutations = {
   createEventType: async (
     _: any,
-    params: EventTypeCreateInputParams,
+    params: CreateEventTypeInputParams,
     ctx: GraphQlContext
   ): Promise<EventType> => {
     try {
@@ -355,91 +399,102 @@ const eventTypeMutations = {
         description,
       } = params;
 
-      let stripeAccountId: string | null | undefined;
+      let stripeProductId: string | null = null;
+      let stripePriceId: string | null = null;
+
       if (collectsPayments) {
-        const userList = await dbClient("users")
-          .select("stripe_account_id")
-          .where("id", userId);
-        stripeAccountId = userList[0].stripe_account_id;
-        if (!stripeAccountId)
+        const user = (
+          await dbClient("users")
+            .select("stripe_account_id")
+            .where("id", userId)
+        )[0];
+
+        if (!user.stripe_account_id)
           throw new GraphQLError(
             "You must first connect to Stripe before setting up event type payment collection!"
           );
-      }
 
-      // create schedule
-      const createdSchedule = await dbClient("schedules").insert(
-        { timezone: schedule.timezone, user_id: userId },
-        "*"
-      );
-      // create schedule periods
-      const schedulePeriods = schedule.periods.map((period) => ({
-        schedule_id: createdSchedule[0].id,
-        start_time: period.startTime,
-        end_time: period.endTime,
-        day: period.day,
-      }));
-      await dbClient("schedule_periods").insert(schedulePeriods);
+        const stripeAccount = (
+          await dbClient("stripe_accounts")
+            .select("*")
+            .where("id", user.stripe_account_id)
+        )[0];
 
-      // create product and price stripe ids if user is stripe connected and params.collectsPayments == true
-      // create event type
-      let stripeProductId: string | null = null;
-      let stripePriceId: string | null = null;
-      if (stripeAccountId) {
+        if (
+          !stripeAccount.details_submitted ||
+          !stripeAccount.charges_enabled ||
+          !stripeAccount.capabilities_enabled
+        )
+          throw new GraphQLError(
+            "You cannot create an event type with payment collection enabled before providing all requested details to Stripe!"
+          );
+
         const stripePrice = await stripeApi.createProductWithPrice({
-          accountId: stripeAccountId,
+          accountId: user.stripe_account_id,
           productName: name,
           unitPrice: paymentFee as number,
         });
-        if (!stripePrice)
-          throw new GraphQLError(
-            "Unexpected error trying to create event type with payment!"
-          );
+
         stripeProductId = stripePrice.product as string;
         stripePriceId = stripePrice.id;
       }
 
-      const createdEventType = await dbClient("event_types").insert(
-        {
-          name,
-          link,
-          duration,
-          description,
-          user_id: userId,
-          location: location.type,
-          location_value: location.value,
-          stripe_price_id: stripePriceId,
-          stripe_product_id: stripeProductId,
-          schedule_id: createdSchedule[0].id,
-          collects_payments: collectsPayments,
-        },
-        "*"
-      );
+      // create schedule
+      const createdSchedule = (
+        await dbClient("schedules").insert(
+          { timezone: schedule.timezone, user_id: userId },
+          "id"
+        )
+      )[0];
+      // create schedule periods
+      const schedulePeriodFields = schedule.periods.map((period) => ({
+        schedule_id: createdSchedule.id,
+        start_time: period.startTime,
+        end_time: period.endTime,
+        day: period.day,
+      }));
+      await dbClient("schedule_periods").insert(schedulePeriodFields);
+
+      const createdEventType = (
+        await dbClient("event_types").insert(
+          {
+            name,
+            link,
+            duration,
+            description,
+            user_id: userId,
+            location: location.type,
+            location_value: location.value,
+            stripe_price_id: stripePriceId,
+            stripe_product_id: stripeProductId,
+            schedule_id: createdSchedule.id,
+            collects_payments: collectsPayments,
+          },
+          "*"
+        )
+      )[0];
 
       // create questions
-      const eventTypeQuestions = questions.map((question, idx) => ({
-        event_type_id: createdEventType[0].id,
+      const questionFields = questions.map((question, idx) => ({
+        event_type_id: createdEventType.id,
         label: question.label,
         is_optional: question.isOptional,
         order: idx,
         type: question.type as TEventTypeQuestionType,
       }));
       const createdQuestions = await dbClient("event_type_questions").insert(
-        eventTypeQuestions,
+        questionFields,
         "*"
       );
 
       // create questions potential answers
-      const eventTypeQuestionsPotentialAnswers = questions
+      const possibleAnswersFields = questions
         .map((question, idx) => {
-          const createdQuestion = createdQuestions.find(
-            (cQuestion) =>
-              cQuestion.label === question.label && cQuestion.order === idx
-          );
+          const createdQuestionId = createdQuestions[idx].id;
 
-          if (createdQuestion && question.possibleAnswers) {
+          if (question.possibleAnswers) {
             return question.possibleAnswers.map((possibleAnswer) => ({
-              question_id: createdQuestion.id,
+              question_id: createdQuestionId,
               value: possibleAnswer,
             }));
           }
@@ -448,29 +503,21 @@ const eventTypeMutations = {
         .flat() as { question_id: string; value: string }[];
 
       await dbClient("event_type_question_possible_answers").insert(
-        eventTypeQuestionsPotentialAnswers
+        possibleAnswersFields
       );
 
       // return event type
-      return createdEventType[0];
+      return createdEventType;
     } catch (err) {
-      if (err instanceof ValidationError) {
-        const { details } = err;
-        const messages = details.reduce(
-          (prev, detail) => (prev += detail.message + " "),
-          ""
-        );
-        throw new GraphQLError(messages);
-      }
-      logger.error("Event Type Create Resolver Error: ", err);
-      throw new GraphQLError(
-        "Unexpected error trying to create an event type!"
-      );
+      return handleGraphqlError(err, {
+        server: "EventType.createEventType resolver error",
+        client: "Unexpected error trying to create event type!",
+      });
     }
   },
   updateEventType: async (
     _: any,
-    params: EventTypeUpdateInputParams,
+    params: UpdateEventTypeParams,
     ctx: GraphQlContext
   ): Promise<EventType> => {
     try {
@@ -502,23 +549,15 @@ const eventTypeMutations = {
 
       return updatedEventType[0];
     } catch (err) {
-      if (err instanceof ValidationError) {
-        const { details } = err;
-        const messages = details.reduce(
-          (prev, detail) => (prev += detail.message + " "),
-          ""
-        );
-        throw new GraphQLError(messages);
-      }
-      logger.error("Event Type Update Error: ", err);
-      throw new GraphQLError(
-        "Unexpected error trying to update an event type!"
-      );
+      return handleGraphqlError(err, {
+        server: "EventType.updateEventType resolver error",
+        client: "Unexpected error trying to update an event type!",
+      });
     }
   },
   deleteEventType: async (
     _: any,
-    params: EventTypeDeleteParams,
+    params: DeleteEventTypeParams,
     ctx: GraphQlContext
   ): Promise<EventType> => {
     try {
@@ -535,15 +574,15 @@ const eventTypeMutations = {
 
       return deletedEventType[0];
     } catch (err) {
-      logger.error("Event Type Delete Error: ", err);
-      throw new GraphQLError(
-        "Unexpected error trying to delete an event type!"
-      );
+      return handleGraphqlError(err, {
+        server: "EventType.deleteEventType resolver error",
+        client: "Unexpected error trying to delete an event type!",
+      });
     }
   },
   updateEventTypeSchedule: async (
     _: any,
-    params: EventTypeScheduleUpdateParams,
+    params: UpdateEventTypeScheduleParams,
     ctx: GraphQlContext
   ): Promise<EventType> => {
     try {
@@ -563,25 +602,26 @@ const eventTypeMutations = {
         await dbClient("event_types").select("*").where("id", eventTypeId)
       )[0];
       const eventTypeScheduleId = eventType.schedule_id;
+
+      // delete schedule and associated periods
       await dbClient("schedule_periods")
         .delete()
         .where("schedule_id", eventTypeScheduleId);
       await dbClient("schedules").delete().where("id", eventTypeScheduleId);
 
-      // create a new schedule and periods
       const updatedSchedule = (
         await dbClient("schedules").insert(
           { user_id: userId, timezone: schedule.timezone },
           "id"
         )
       )[0];
-      const schedulePeriods = schedule.periods.map((period) => ({
+      const schedulePeriodFields = schedule.periods.map((period) => ({
         schedule_id: updatedSchedule.id,
         day: period.day,
         start_time: period.startTime,
         end_time: period.endTime,
       }));
-      await dbClient("schedule_periods").insert(schedulePeriods);
+      await dbClient("schedule_periods").insert(schedulePeriodFields);
 
       // update event type schedule foreign key
       await dbClient("event_types")
@@ -593,23 +633,15 @@ const eventTypeMutations = {
         schedule_id: updatedSchedule.id,
       };
     } catch (err) {
-      if (err instanceof ValidationError) {
-        const { details } = err;
-        const messages = details.reduce(
-          (prev, detail) => (prev += detail.message + " "),
-          ""
-        );
-        throw new GraphQLError(messages);
-      }
-      logger.error("Event Type Update Schedule Error: ", err);
-      throw new GraphQLError(
-        "Unexpected error trying to update an event's type schedule!"
-      );
+      return handleGraphqlError(err, {
+        server: "EventType.updateEventTypeSchedule resolver error",
+        client: "Unexpected error trying to update an event's type schedule!",
+      });
     }
   },
   updateEventTypePayment: async (
     _: any,
-    params: EventTypeUpdatePaymentParams,
+    params: UpdateEventTypePaymentParams,
     ctx: GraphQlContext
   ): Promise<EventType> => {
     try {
@@ -617,18 +649,41 @@ const eventTypeMutations = {
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
 
-      await eventTypeUpdatePaymentParamsValidationSchema.validateAsync(params);
-
       const { id: userId } = req.session.user as TUserSessionData;
       const { dbClient, stripeApi } = ctx.services;
+
+      // check if user is connected to stripe
+      const user = (
+        await dbClient("users").select("stripe_account_id").where("id", userId)
+      )[0];
+
+      if (!user.stripe_account_id)
+        throw new GraphQLError(
+          "You cannot make updates to an event type payment options without being connected to Stripe!"
+        );
+
+      // check if user has fulfilled all of stripe's info requirements
+      const stripeAccount = (
+        await dbClient("stripe_accounts")
+          .select("*")
+          .where("id", user.stripe_account_id)
+      )[0];
+      if (
+        !stripeAccount.capabilities_enabled ||
+        !stripeAccount.details_submitted ||
+        !stripeAccount.charges_enabled
+      )
+        throw new GraphQLError(
+          "You cannot make updates to an event type payment options without providing all requested information to Stripe!"
+        );
+
+      await eventTypeUpdatePaymentParamsValidationSchema.validateAsync(params);
+
       const { eventTypeId, params: updateParams } = params;
       const { collectsPayments, paymentFee } = updateParams;
 
       const eventType = (
         await dbClient("event_types").select("*").where("id", eventTypeId)
-      )[0];
-      const userAccount = (
-        await dbClient("users").select("stripe_account_id").where("id", userId)
       )[0];
 
       let paymentUpdateFields: Partial<EventType> = {
@@ -637,20 +692,11 @@ const eventTypeMutations = {
       };
 
       if (collectsPayments && !eventType.collects_payments) {
-        if (!userAccount.stripe_account_id)
-          throw new GraphQLError(
-            "You cannot toggle payments for a given event type without being connected to Stripe!"
-          );
-
         const priceWithProduct = await stripeApi.createProductWithPrice({
-          accountId: userAccount.stripe_account_id,
+          accountId: user.stripe_account_id,
           productName: eventType.name,
           unitPrice: paymentFee as number,
         });
-        if (!priceWithProduct)
-          throw new GraphQLError(
-            "Unexpected error trying to toggle payment for a given event type!"
-          );
 
         paymentUpdateFields = {
           ...paymentUpdateFields,
@@ -658,14 +704,10 @@ const eventTypeMutations = {
           stripe_price_id: priceWithProduct.id,
         };
       } else if (collectsPayments && eventType.collects_payments) {
-        if (
-          paymentFee !== eventType.payment_fee &&
-          userAccount.stripe_account_id &&
-          eventType.stripe_price_id
-        ) {
+        if (paymentFee !== eventType.payment_fee && eventType.stripe_price_id) {
           // fees differ => update stripe's price unit amount
           await stripeApi.updatePriceAmount({
-            accountId: userAccount.stripe_account_id,
+            accountId: user.stripe_account_id,
             priceId: eventType.stripe_price_id,
             unitPrice: paymentFee as number,
           });
@@ -687,23 +729,16 @@ const eventTypeMutations = {
 
       return updatedEventType;
     } catch (err) {
-      if (err instanceof ValidationError) {
-        const { details } = err;
-        const messages = details.reduce(
-          (prev, detail) => (prev += detail.message + " "),
-          ""
-        );
-        throw new GraphQLError(messages);
-      }
-      logger.error("Event Type Update Payment Error: ", err);
-      throw new GraphQLError(
-        "Unexpected error trying to update an event's type payment!"
-      );
+      return handleGraphqlError(err, {
+        server: "EventType.updateEventTypePayment resolver error",
+        client:
+          "Unexpected error trying to update an event type payment options!",
+      });
     }
   },
   updateEventTypeQuestions: async (
     _: any,
-    params: EventTypeUpdateQuestionsParams,
+    params: UpdateEventTypeQuestionsParams,
     ctx: GraphQlContext
   ): Promise<EventType> => {
     try {
@@ -733,7 +768,7 @@ const eventTypeMutations = {
         .whereIn("id", questionIds);
 
       // create questions
-      const eventTypeQuestions = questions.map((question, idx) => ({
+      const questionFields = questions.map((question, idx) => ({
         event_type_id: eventTypeId,
         label: question.label,
         is_optional: question.isOptional,
@@ -741,21 +776,18 @@ const eventTypeMutations = {
         type: question.type as TEventTypeQuestionType,
       }));
       const createdQuestions = await dbClient("event_type_questions").insert(
-        eventTypeQuestions,
+        questionFields,
         "*"
       );
 
       // create questions potential answers
-      const eventTypeQuestionsPotentialAnswers = questions
+      const possibleAnswersFields = questions
         .map((question, idx) => {
-          const createdQuestion = createdQuestions.find(
-            (cQuestion) =>
-              cQuestion.label === question.label && cQuestion.order === idx
-          );
+          const createdQuestionId = createdQuestions[idx].id;
 
-          if (createdQuestion && question.possibleAnswers) {
+          if (question.possibleAnswers) {
             return question.possibleAnswers.map((possibleAnswer) => ({
-              question_id: createdQuestion.id,
+              question_id: createdQuestionId,
               value: possibleAnswer,
             }));
           }
@@ -764,7 +796,7 @@ const eventTypeMutations = {
         .flat() as { question_id: string; value: string }[];
 
       await dbClient("event_type_question_possible_answers").insert(
-        eventTypeQuestionsPotentialAnswers
+        possibleAnswersFields
       );
 
       const updatedEventType = (
@@ -773,18 +805,10 @@ const eventTypeMutations = {
 
       return updatedEventType;
     } catch (err) {
-      if (err instanceof ValidationError) {
-        const { details } = err;
-        const messages = details.reduce(
-          (prev, detail) => (prev += detail.message + " "),
-          ""
-        );
-        throw new GraphQLError(messages);
-      }
-      logger.error("Event Type Update Questions Error: ", err);
-      throw new GraphQLError(
-        "Unexpected error trying to update an event's type questions!"
-      );
+      return handleGraphqlError(err, {
+        server: "EventType.updateEventTypeQuestions resolver error",
+        client: "Unexpected error trying to update an event type questions",
+      });
     }
   },
 };
