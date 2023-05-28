@@ -2,6 +2,9 @@ import dayjs from "dayjs";
 import logger from "../loaders/logger";
 import knexClient from "../loaders/knex";
 
+import { GraphQLError } from "graphql";
+import { ValidationError } from "joi";
+
 import {
   getAvailableTimeSlots,
   isTimeSlotAvailable,
@@ -303,4 +306,28 @@ const isSlotValid = async (
   }
 };
 
-export { retrieveMonthSlots, isSlotValid };
+type TErrorInfo = {
+  client?: string;
+  server?: string;
+};
+const handleGraphqlError = (error: any, info: TErrorInfo): never => {
+  if (error instanceof ValidationError) {
+    const { message, details } = error;
+    const messages = details.reduce(
+      (prev, detail) => (prev += detail.message + " "),
+      message
+    );
+    throw new GraphQLError(messages);
+  } else if (error instanceof GraphQLError) throw error;
+
+  const defaultErrorMessage =
+    "Unexpected error trying to serve GraphQl request: ";
+
+  const serverErrorMessage = `${info.server || defaultErrorMessage}\t ${error}`;
+  logger.error(serverErrorMessage);
+
+  const clientErrorMessage = info.client || defaultErrorMessage;
+  throw new GraphQLError(clientErrorMessage);
+};
+
+export { retrieveMonthSlots, isSlotValid, handleGraphqlError };

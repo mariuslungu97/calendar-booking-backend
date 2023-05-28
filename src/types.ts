@@ -568,35 +568,6 @@ export interface QuestionQl {
   possibleAnswers: string[] | null;
 }
 
-// User Resolvers
-
-export interface UserCreateInputParams {
-  username: string;
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-}
-
-export interface UserLoginParams {
-  email: string;
-  password: string;
-}
-
-export interface AccountCreateResponse {
-  message: string;
-}
-
-export interface ConnectionResponse {
-  message: string;
-  redirect: string;
-}
-
-export interface LoginResponse {
-  message: string;
-  is2FaActivated: boolean;
-}
-
 /**
  * ==========================
  * ========= MISC ===========

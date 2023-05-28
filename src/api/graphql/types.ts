@@ -202,7 +202,7 @@ const graphQlTypeDefs = `
     edges: [Payment!]!
   }
   
-  type AccountCreateResponse {
+  type CreateAccountResponse {
     message: String!
   }
 
@@ -225,7 +225,7 @@ const graphQlTypeDefs = `
   }
 
   type Mutation {
-    createAccount(params: UserCreateInput!): AccountCreateResponse!
+    createAccount(params: UserCreateInput!): CreateAccountResponse!
     login(email: String!, password: String!): LoginResponse!
     activate2Fa(): User!
     connectGoogleCalendar(): ConnectResponse!

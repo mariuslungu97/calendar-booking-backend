@@ -1,6 +1,11 @@
 import Joi from "joi";
 
-const userCreateValidationSchema = Joi.object({
+const loginValidationSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().max(200).required(),
+});
+
+const createAccountValidationSchema = Joi.object({
   username: Joi.string().alphanum().min(3).max(50).required(),
   email: Joi.string().email().required(),
   firstName: Joi.string()
@@ -12,7 +17,7 @@ const userCreateValidationSchema = Joi.object({
     .pattern(/^[a-zA-Z\s]*$/)
     .required(),
   password: Joi.string()
-    .max(200)
+    .max(100)
     .pattern(new RegExp(/^(?=.*[a-z])(?=.*[A-Z])(?=.*d)[a-zA-Zd]{8,}$/))
     .required()
     .messages({
@@ -21,9 +26,4 @@ const userCreateValidationSchema = Joi.object({
     }),
 });
 
-const userLoginValidationSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().max(200).required(),
-});
-
-export { userCreateValidationSchema, userLoginValidationSchema };
+export { createAccountValidationSchema, loginValidationSchema };

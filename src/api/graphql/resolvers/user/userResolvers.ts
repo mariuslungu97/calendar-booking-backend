@@ -6,24 +6,49 @@ import Stripe from "stripe";
 import logger from "../../../../loaders/logger";
 
 import {
-  userCreateValidationSchema,
-  userLoginValidationSchema,
+  loginValidationSchema,
+  createAccountValidationSchema,
 } from "./userValidation";
 import { isLoggedIn } from "../../../middleware/auth";
+import { handleGraphqlError } from "../../../../utils/api";
 
 import {
   User,
   Event,
-  EventType,
-  UserCreateInputParams,
-  UserLoginParams,
-  LoginResponse,
-  AccountCreateResponse,
-  ConnectionResponse,
   Payment,
+  EventType,
   GraphQlContext,
   TUserSessionData,
 } from "../../../../types";
+
+interface CreateAccountInputParams {
+  params: {
+    username: string;
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+interface LoginParams {
+  email: string;
+  password: string;
+}
+
+interface CreateAccountResponse {
+  message: string;
+}
+
+interface LoginResponse {
+  message: string;
+  is2FaActivated: boolean;
+}
+
+interface ConnectResponse {
+  message: string;
+  redirect: string;
+}
 
 const userFields = {
   User: {
@@ -55,10 +80,10 @@ const userFields = {
 
         return upcomingEvents;
       } catch (err) {
-        logger.error("Upcoming Events Resolver Error: ", err);
-        throw new GraphQLError(
-          "Unexpected error trying to retrieve upcoming events for user!"
-        );
+        return handleGraphqlError(err, {
+          server: "User.upcomingEvents resolver error",
+          client: "Unexpected error trying to retrieve user's upcoming events!",
+        });
       }
     },
     recentEventTypes: async (
@@ -78,10 +103,11 @@ const userFields = {
 
         return recentEventTypes;
       } catch (err) {
-        logger.error("Recent Event Types Resolver Error: ", err);
-        throw new GraphQLError(
-          "Unexpected error trying to retrieve recent event types for user!"
-        );
+        return handleGraphqlError(err, {
+          server: "User.recentEventTypes resolver error",
+          client:
+            "Unexpected error trying to retrieve user's recently updated event types!",
+        });
       }
     },
     recentPayments: async (
@@ -101,10 +127,11 @@ const userFields = {
 
         return recentPayments;
       } catch (err) {
-        logger.error("Recent Payments Resolver Error: ", err);
-        throw new GraphQLError(
-          "Unexpected error trying to retrieve recent payments for user!"
-        );
+        return handleGraphqlError(err, {
+          server: "User.recentPayments resolver error",
+          client:
+            "Unexpected error trying to retrieve user's most recently received payments!",
+        });
       }
     },
   },
@@ -119,15 +146,14 @@ const userQueries = {
     const { id } = req.session.user as TUserSessionData;
 
     try {
-      const userList = await dbClient("users").select("*").where({ id });
-      if (!userList.length)
-        throw new GraphQLError("Unexpected error trying to retrieve user!");
-
-      const user = userList[0];
+      const user = (await dbClient("users").select("*").where({ id }))[0];
       return user;
     } catch (err) {
-      logger.error("Me Resolver Error: ", err);
-      throw new GraphQLError("Unexpected error trying to retrieve user!");
+      return handleGraphqlError(err, {
+        server: "User.me resolver error",
+        client:
+          "Unexpected error trying to retrieve your account's information!",
+      });
     }
   },
 };
@@ -135,14 +161,15 @@ const userQueries = {
 const userMutations = {
   createAccount: async (
     _: any,
-    params: UserCreateInputParams,
+    params: CreateAccountInputParams,
     ctx: GraphQlContext
-  ): Promise<AccountCreateResponse> => {
+  ): Promise<CreateAccountResponse> => {
     try {
-      await userCreateValidationSchema.validateAsync(params);
+      const { params: createParams } = params;
+      await createAccountValidationSchema.validateAsync(createParams);
 
       const { dbClient } = ctx.services;
-      const { username, email, password, firstName, lastName } = params;
+      const { username, email, password, firstName, lastName } = createParams;
 
       const existingAccountList = await dbClient("users")
         .select("id")
@@ -169,29 +196,24 @@ const userMutations = {
           "You have succesfully created an account. You can now login using your email and password!",
       };
     } catch (err) {
-      if (err instanceof ValidationError) {
-        const { details } = err;
-        const messages = details.reduce(
-          (prev, detail) => (prev += detail.message + " "),
-          ""
-        );
-        throw new GraphQLError(messages);
-      }
-      logger.error("Create Account Resolver Error", err);
-      throw new GraphQLError("Unexpected error trying to create account");
+      return handleGraphqlError(err, {
+        server: "User.createAccount resolver error",
+        client: "Unexpected error trying to create an account!",
+      });
     }
   },
   login: async (
     _: any,
-    params: UserLoginParams,
+    params: LoginParams,
     ctx: GraphQlContext
   ): Promise<LoginResponse> => {
     try {
       const { req } = ctx;
-      const { dbClient, emailApi } = ctx.services;
 
-      await userLoginValidationSchema.validateAsync(params);
+      await loginValidationSchema.validateAsync(params);
       const { email, password } = params;
+
+      const { dbClient, emailApi } = ctx.services;
 
       const loggedAccountList = await dbClient("users").where("email", email);
       if (!loggedAccountList.length)
@@ -212,12 +234,13 @@ const userMutations = {
       let message = "";
       if (!loggedAccount.is_2fa_activated) {
         message = "You have succesfully logged in!";
+        // create session
         req.session.user = {} as TUserSessionData;
         req.session.user.id = loggedAccount.id;
         req.session.user.email = loggedAccount.email;
       } else {
         message =
-          "You have 2 factor authentication enabled. Click the link we've sent to your email address to login!";
+          "Your account has 2-factor auth enabled. Check your email address for the access link you must click to login!";
         const { username, first_name: userFirstName } = loggedAccount;
         emailApi.sendMail({
           to: loggedAccount.email,
@@ -231,16 +254,10 @@ const userMutations = {
         is2FaActivated: loggedAccount.is_2fa_activated,
       };
     } catch (err) {
-      if (err instanceof ValidationError) {
-        const { details } = err;
-        const messages = details.reduce(
-          (prev, detail) => (prev += detail.message + " "),
-          ""
-        );
-        throw new GraphQLError(messages);
-      }
-      logger.error("Login Account Resolver Error", err);
-      throw new GraphQLError("Unexpected error trying to login into account");
+      return handleGraphqlError(err, {
+        server: "User.login resolver error",
+        client: "Unexpected error trying to login into account!",
+      });
     }
   },
   activate2Fa: async (_: any, __: any, ctx: GraphQlContext): Promise<User> => {
@@ -256,47 +273,64 @@ const userMutations = {
         .update({ is_2fa_activated: true })
         .where("id", id);
 
-      const updatedUserList = await dbClient("users")
-        .select("*")
-        .where("id", id);
+      const updatedUser = (
+        await dbClient("users").select("*").where("id", id)
+      )[0];
 
-      return updatedUserList[0];
+      return updatedUser;
     } catch (err) {
-      logger.error("Activate2Fa Account Resolver Error", err);
-      throw new GraphQLError(
-        "Unexpected error trying to activate 2 factor authentication"
-      );
+      return handleGraphqlError(err, {
+        server: "User.activate2Fa resolver error",
+        client: "Unexpected error trying to activate 2-factor authentication!",
+      });
     }
   },
   connectGoogleCalendar: async (
     _: any,
     __: any,
     ctx: GraphQlContext
-  ): Promise<ConnectionResponse> => {
-    const { req } = ctx;
-    const { oAuthApi } = ctx.services;
+  ): Promise<ConnectResponse> => {
+    try {
+      const { req } = ctx;
+      const { oAuthApi } = ctx.services;
 
-    if (!isLoggedIn(req)) throw new GraphQLError("You are not authenticated!");
+      if (!isLoggedIn(req))
+        throw new GraphQLError("You are not authenticated!");
 
-    const userSession = req.session.user as TUserSessionData;
-    const authState = { userId: userSession.id };
-    const encodedState = Buffer.from(JSON.stringify(authState)).toString(
-      "base64url"
-    );
+      const { dbClient } = ctx.services;
 
-    let authUrl = oAuthApi.generateOAuthUrl();
-    authUrl += `state=${encodedState}`;
+      const { id } = ctx.req.session.user as TUserSessionData;
+      const googleConnectionList = await dbClient("oauth_connections")
+        .select("user_id")
+        .where("user_id", id)
+        .andWhere("provider", "GOOGLE");
+      if (googleConnectionList.length)
+        throw new GraphQLError("You are already connected to Google!");
 
-    return {
-      message: "Follow the redirect link to connect to your Google Calendar!",
-      redirect: authUrl,
-    };
+      const authState = { userId: id };
+      const encodedState = Buffer.from(JSON.stringify(authState)).toString(
+        "base64url"
+      );
+
+      let authUrl = oAuthApi.generateOAuthUrl();
+      authUrl += `state=${encodedState}`;
+
+      return {
+        message: "Follow the redirect link to connect to your Google Calendar!",
+        redirect: authUrl,
+      };
+    } catch (err) {
+      return handleGraphqlError(err, {
+        server: "User.connectGoogleCalendar resolver error",
+        client: "Unexpected error trying to connect to Google Calendar!",
+      });
+    }
   },
   connectStripe: async (
     _: any,
     __: any,
     ctx: GraphQlContext
-  ): Promise<ConnectionResponse> => {
+  ): Promise<ConnectResponse> => {
     const { req } = ctx;
     const { dbClient, stripeApi } = ctx.services;
 
@@ -305,19 +339,13 @@ const userMutations = {
     const { id } = ctx.req.session.user as TUserSessionData;
 
     try {
-      const userList = await dbClient("users").select("*").where("id", id);
+      const user = (await dbClient("users").select("*").where("id", id))[0];
 
-      if (!userList.length)
-        throw new GraphQLError(
-          "Unexpected error trying to connect a Stripe account"
-        );
-
-      const user = userList[0];
       if (!user.is_email_verified)
         throw new GraphQLError(
           "You cannot connect a Stripe account without having verified your email!"
         );
-      if (!user.is_2fa_activated)
+      else if (!user.is_2fa_activated)
         throw new GraphQLError(
           "You cannot connect a Stripe account without having 2 factor authentication activated!"
         );
