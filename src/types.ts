@@ -400,22 +400,22 @@ export type TStripeDeleteProductWithPriceParams = {
 export interface IStripeApi {
   createAccount: (
     params: TStripeCreateAccountParams
-  ) => Promise<Stripe.Account | null>;
+  ) => Promise<Stripe.Account>;
   retrieveAccount: (
     params: TStripeRetrieveAccountParams
-  ) => Promise<Stripe.Account | null>;
+  ) => Promise<Stripe.Account>;
   createAccountLink: (
     params: TStripeCreateAccountLinkParams
-  ) => Promise<Stripe.AccountLink | null>;
+  ) => Promise<Stripe.AccountLink>;
   createProductWithPrice: (
     params: TStripeCreateProductWithPriceParams
-  ) => Promise<Stripe.Price | null>;
+  ) => Promise<Stripe.Price>;
   updatePriceAmount: (
     params: TStripeUpdatePriceAmountParams
-  ) => Promise<Stripe.Price | null>;
+  ) => Promise<Stripe.Price>;
   createPaymentSession: (
     params: TStripeCreatePaymentSessionParams
-  ) => Promise<Stripe.Checkout.Session | null>;
+  ) => Promise<Stripe.Checkout.Session>;
 }
 
 /**

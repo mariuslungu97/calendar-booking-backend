@@ -1,9 +1,5 @@
 import { GraphQLError } from "graphql";
-import { ValidationError } from "joi";
 import bcrypt from "bcrypt";
-import Stripe from "stripe";
-
-import logger from "../../../../loaders/logger";
 
 import {
   loginValidationSchema,
@@ -341,58 +337,48 @@ const userMutations = {
     try {
       const user = (await dbClient("users").select("*").where("id", id))[0];
 
-      if (!user.is_email_verified)
-        throw new GraphQLError(
-          "You cannot connect a Stripe account without having verified your email!"
-        );
-      else if (!user.is_2fa_activated)
-        throw new GraphQLError(
-          "You cannot connect a Stripe account without having 2 factor authentication activated!"
-        );
+      let stripeAccountId: string;
 
-      let stripeAccount: Stripe.Account | null = null;
-      const stripeAccountId = user.stripe_account_id;
-
-      if (stripeAccountId) {
-        stripeAccount = await stripeApi.retrieveAccount({
-          accountId: stripeAccountId,
-        });
+      if (user.stripe_account_id) {
+        // stripe account already exists
+        stripeAccountId = user.stripe_account_id;
+        const areDetailsSubmitted = (
+          await dbClient("stripe_accounts")
+            .select("details_submitted")
+            .where("id", user.stripe_account_id)
+        )[0].details_submitted;
+        if (areDetailsSubmitted)
+          throw new GraphQLError("You are already connected to Stripe!");
       } else {
-        stripeAccount = await stripeApi.createAccount({
+        const stripeAccount = await stripeApi.createAccount({
           email: user.email,
           firstName: user.first_name,
           lastName: user.last_name,
         });
-        if (stripeAccount) {
-          await dbClient("users")
-            .update({ stripe_account_id: stripeAccount.id })
-            .where("id", id);
-        }
+
+        await dbClient("stripe_accounts").insert({
+          id: stripeAccount.id,
+        });
+
+        await dbClient("users")
+          .update({ stripe_account_id: stripeAccount.id })
+          .where("id", id);
+
+        stripeAccountId = stripeAccount.id;
       }
 
-      if (!stripeAccount)
-        throw new GraphQLError(
-          "Unexpected error trying to create a Stripe account!"
-        );
-
       const stripeAccountLink = await stripeApi.createAccountLink({
-        accountId: stripeAccount.id,
+        accountId: stripeAccountId,
       });
-
-      if (!stripeAccountLink)
-        throw new GraphQLError(
-          "Unexpected error trying to create a Stripe account link!"
-        );
-
       return {
-        message: "Follow the redirect link to connect your Stripe account!",
+        message: "Follow the redirect link to connect to your Stripe Account!",
         redirect: stripeAccountLink.url,
       };
     } catch (err) {
-      logger.error("Connect Stripe Account Resolver Error", err);
-      throw new GraphQLError(
-        "Unexpected error trying to connect a Stripe account"
-      );
+      return handleGraphqlError(err, {
+        server: "User.connectStripe resolver error",
+        client: "Unexpected error trying to connect to Stripe!",
+      });
     }
   },
 };
