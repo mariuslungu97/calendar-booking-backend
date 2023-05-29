@@ -202,11 +202,14 @@ const isTimeSlotAvailable = (
   return timePeriod.isSlotAvailable(new TimeSlot(slot[0], slot[1]));
 };
 
-const getMonthStartEnd = (month: string): [Dayjs, Dayjs] => {
-  let startDateTime = dayjs(`01-${month}`, "DD-MM-YYYY");
+const getMonthStartEnd = (
+  month: string,
+  dateFormat = "DD-MM-YYYY"
+): [Dayjs, Dayjs] => {
+  let startDateTime = dayjs(`01-${month}`, dateFormat);
   let endDateTime = dayjs(
     `${startDateTime.daysInMonth()}-${month}`,
-    "DD-MM-YYYY"
+    dateFormat
   );
 
   startDateTime = startDateTime.hour(0).minute(0).second(0);
@@ -217,16 +220,12 @@ const getMonthStartEnd = (month: string): [Dayjs, Dayjs] => {
 
 const getDateStartEnd = (
   date: string,
-  timezone: string = "Etc/UTC",
   dateFormat = "DD-MM-YYYY"
 ): [Dayjs, Dayjs] => {
   const dateStart = dayjs(date, dateFormat).hour(0).minute(0).second(0);
   const dateEnd = dayjs(date, dateFormat).hour(23).minute(59).second(59);
 
-  const dateStartLocal = dayjs.tz(dateStart, timezone);
-  const dateEndLocal = dayjs.tz(dateEnd, timezone);
-
-  return [dateStartLocal, dateEndLocal];
+  return [dateStart, dateEnd];
 };
 
 const convertDayTime = (
