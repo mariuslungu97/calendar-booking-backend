@@ -17,6 +17,13 @@ const isValidTimeZone = (tz: string) => {
   }
 };
 
+const availableTimesParamsValidationSchema = Joi.object({
+  date: Joi.string()
+    .pattern(new RegExp(/^(0?[1-9]|[12][0-9]|3[01])-(0?[1-9]|1[012])-\d{4}$/))
+    .required(),
+  timezone: Joi.date().custom(isValidTimeZone).required(),
+});
+
 const availableDatesParamsValidationSchema = Joi.object({
   month: Joi.string()
     .pattern(new RegExp(/^((0[1-9])|(1[0-2]))-(\d{4})$/))
@@ -142,6 +149,7 @@ const eventTypeUpdateQuestionsParamsValidationSchema = Joi.object({
 export {
   eventTypeUpdateParamsValidationSchema,
   availableDatesParamsValidationSchema,
+  availableTimesParamsValidationSchema,
   eventTypeCreateInputValidationSchema,
   eventTypeUpdatePaymentParamsValidationSchema,
   eventTypeScheduleUpdateParamsValidationSchema,

@@ -2,12 +2,14 @@ import { GraphQLError } from "graphql";
 import dayjs from "dayjs";
 
 import {
-  retrieveAvailableSlots,
+  retrieveAvailableDates,
+  retrieveAvailableTimes,
   handleGraphqlError,
 } from "../../../../utils/api";
 import { dateToTimezone } from "../../../../utils/schedule";
 import {
   availableDatesParamsValidationSchema,
+  availableTimesParamsValidationSchema,
   eventTypeCreateInputValidationSchema,
   eventTypeUpdateParamsValidationSchema,
   eventTypeUpdatePaymentParamsValidationSchema,
@@ -18,6 +20,7 @@ import {
 import {
   EventType,
   PageInfo,
+  AvailableDate,
   AvailableDates,
   CursorPaginationParams,
   GraphQlContext,
@@ -52,6 +55,11 @@ interface Schedule {
 
 interface AvailableDatesParams {
   month: string;
+  timezone: string;
+}
+
+interface AvailableTimesParams {
+  date: string;
   timezone: string;
 }
 
@@ -176,7 +184,7 @@ const eventTypeFields = {
 
         if (
           monthDate.isBefore(visitorCurrentDate, "month") ||
-          monthDate.isAfter(visitorCurrentDate.add(6, "month"))
+          monthDate.isAfter(visitorCurrentDate.add(6, "month"), "month")
         ) {
           throw new GraphQLError(
             "You can only retrieve available dates within the next 6 months!"
@@ -188,7 +196,7 @@ const eventTypeFields = {
 
         const eventType = (await dbClient("event_types").where("id", id))[0];
 
-        const availableDates = await retrieveAvailableSlots(
+        const availableDates = await retrieveAvailableDates(
           eventType,
           month,
           timezone
@@ -199,6 +207,48 @@ const eventTypeFields = {
           server: "VisitorEventType.availableDates resolver error",
           client:
             "Unexpected error trying to retrieve event's type available dates!",
+        });
+      }
+    },
+    availableTimes: async (
+      parent: EventType,
+      params: AvailableTimesParams,
+      ctx: GraphQlContext
+    ): Promise<AvailableDate> => {
+      try {
+        await availableTimesParamsValidationSchema.validateAsync(params);
+
+        const { date, timezone } = params;
+
+        // validate date to be within today's date and a date within 6 months from now
+        const dayDate = dayjs(date, "DD-MM-YYYY");
+        const visitorCurrentDate = dateToTimezone(dayjs(), timezone);
+
+        if (
+          dayDate.isBefore(visitorCurrentDate, "date") ||
+          dayDate.isAfter(visitorCurrentDate.add(6, "month"), "date")
+        ) {
+          throw new GraphQLError(
+            "You can only retrieve available dates within the next 6 months!"
+          );
+        }
+
+        const { dbClient } = ctx.services;
+        const { id } = parent;
+
+        const eventType = (await dbClient("event_types").where("id", id))[0];
+
+        const availableTimes = await retrieveAvailableTimes(
+          eventType,
+          date,
+          timezone
+        );
+        return availableTimes;
+      } catch (err) {
+        return handleGraphqlError(err, {
+          server: "VisitorEventType.availableTimes resolver error",
+          client:
+            "Unexpected error trying to retrieve event's type available times by date!",
         });
       }
     },

@@ -81,6 +81,7 @@ const graphQlTypeDefs = `
 
   type VisitorEventType implements EventType {
     availableDates(month: String!, timezone: String!): AvailableDates!
+    availableTimes(date: String!, timezone: String!): AvailableDate!
   }
 
   type UserEventType implements EventType {
