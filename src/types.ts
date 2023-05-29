@@ -444,6 +444,13 @@ export type TEventNotifyUpdatePayload = {
   newDateTime: { start: string; end: string };
 };
 
+export type TCancelEventPayload = {
+  userFullName: string;
+  eventTypeName: string;
+  displayTimezone: string;
+  eventDateTime: { start: string; end: string };
+};
+
 export type TTwoFactorAuthPayload = {
   username: string;
   userFirstName: string;
@@ -469,6 +476,11 @@ export type TSendMailParams =
       to: string;
       type: "TWO_FACTOR_AUTH";
       payload: TTwoFactorAuthPayload;
+    }
+  | {
+      to: string;
+      type: "CANCEL_EVENT";
+      payload: TCancelEventPayload;
     };
 
 export type TSendMailType = TSendMailParams["type"];

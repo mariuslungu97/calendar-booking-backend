@@ -26,13 +26,16 @@ const process = async (job: Job<TMailJobData>) => {
   try {
     const html = await readHTMLFile(htmlFilePath);
 
-    const jwtToken = await generateJwtLink(jwtPayload, linkExpirationDate);
+    let allHtmlReplacements = { ...htmlReplacements };
+    if (type !== "CANCEL_EVENT") {
+      const jwtToken = await generateJwtLink(jwtPayload, linkExpirationDate);
 
-    const link = linkUri + jwtToken;
-    const allhtmlReplacements = { ...htmlReplacements, link };
+      const link = linkUri + jwtToken;
+      allHtmlReplacements = { ...htmlReplacements, link };
+    }
 
     const htmlTemplate = handlebars.compile(html);
-    const htmlToSend = htmlTemplate(allhtmlReplacements);
+    const htmlToSend = htmlTemplate(allHtmlReplacements);
     const transporter = await getTransporter();
     await transporter.sendMail({
       to,

@@ -10,6 +10,7 @@ import {
   TSendMailType,
   TSendMailPayload,
   TVerifyEmailPayload,
+  TCancelEventPayload,
   TEventNotifyUpdatePayload,
   TEventConfirmationPayload,
   TTwoFactorAuthPayload,
@@ -167,6 +168,22 @@ const generateMailFields = (
 
     jwtPayload = { username };
     htmlReplacements = { userFirstName };
+  } else if (type === "CANCEL_EVENT") {
+    const typedPayload = payload as TCancelEventPayload;
+    const { eventTypeName, userFullName, displayTimezone, eventDateTime } =
+      typedPayload;
+
+    subject = `${name} - Cancelled Event`;
+    htmlFilePath += "cancelEvent.html";
+    htmlReplacements = {
+      userFullName,
+      title: `${eventTypeName} has been cancelled!`,
+      date: formatMailDate(
+        eventDateTime.start,
+        eventDateTime.end,
+        displayTimezone
+      ),
+    };
   }
 
   return {
