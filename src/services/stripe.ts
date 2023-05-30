@@ -11,6 +11,7 @@ import {
   TStripeUpdatePriceAmountParams,
   TStripeCreateProductWithPriceParams,
   TStripeCreatePaymentSessionParams,
+  TStripeConstructWebhookEventParams,
 } from "../types";
 
 const { uri } = config.app;
@@ -20,6 +21,7 @@ const {
   accountLinkReturnUri,
   paymentSuccessUri,
   paymentCancelUri,
+  webhookEndpointsSecret,
 } = config.stripe;
 
 const stripe = new Stripe(apiKey, { apiVersion: "2022-11-15" });
@@ -157,6 +159,13 @@ const createPaymentSession = async (
   }
 };
 
+const constructWebhookEvent = (params: TStripeConstructWebhookEventParams) =>
+  stripe.webhooks.constructEvent(
+    params.body,
+    params.signature,
+    webhookEndpointsSecret
+  );
+
 const stripeApi: IStripeApi = {
   createAccount,
   retrieveAccount,
@@ -164,6 +173,7 @@ const stripeApi: IStripeApi = {
   createAccountLink,
   createProductWithPrice,
   createPaymentSession,
+  constructWebhookEvent,
 };
 
 export default stripeApi;

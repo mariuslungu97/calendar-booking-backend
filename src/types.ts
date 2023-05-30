@@ -396,6 +396,11 @@ export type TStripeDeleteProductWithPriceParams = {
   productId: string;
 };
 
+export type TStripeConstructWebhookEventParams = {
+  body: Buffer | string;
+  signature: string;
+};
+
 export interface IStripeApi {
   createAccount: (
     params: TStripeCreateAccountParams
@@ -415,6 +420,9 @@ export interface IStripeApi {
   createPaymentSession: (
     params: TStripeCreatePaymentSessionParams
   ) => Promise<Stripe.Checkout.Session>;
+  constructWebhookEvent: (
+    params: TStripeConstructWebhookEventParams
+  ) => Stripe.Event;
 }
 
 /**

@@ -48,6 +48,10 @@ const config = {
   },
   stripe: {
     apiKey: mandatoryEnv(process.env.STRIPE_API_KEY, "STRIPE_API_KEY"),
+    webhookEndpointsSecret: mandatoryEnv(
+      process.env.STRIPE_WEBHOOK_ENDPOINTS_SECRET,
+      "STRIPE_WEBHOOK_ENDPOINTS_SECRET"
+    ),
     accountLinkRefreshUri:
       process.env.STRIPE_ACCOUNT_LINKS_REFRESH_URI ||
       "/stripe/accounts/refresh",
