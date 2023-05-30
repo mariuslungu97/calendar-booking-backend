@@ -183,7 +183,7 @@ const eventQueries = {
         throw new GraphQLError("You are not authenticated!");
 
       const { dbClient } = ctx.services;
-      const { id } = req.session.user as TUserSessionData;
+      const { id: userId } = req.session.user as TUserSessionData;
       const { cursor, order, take } = params;
 
       const decodedCursor = Buffer.from(cursor, "base64").toString("ascii");
@@ -194,7 +194,7 @@ const eventQueries = {
       const updatedOrder = isNext ? order : order === "DESC" ? "ASC" : "DESC";
       const events = await dbClient("events")
         .select("*")
-        .where("id", id)
+        .where("user_id", userId)
         .andWhere("created_at", operator, timestamp)
         .orderBy("created_at", updatedOrder)
         .limit(take);
@@ -210,13 +210,13 @@ const eventQueries = {
 
       const prevEvent = await dbClient("events")
         .select("created_at")
-        .where("id", id)
+        .where("user_id", userId)
         .andWhere("created_at", operator, firstEventType.created_at)
         .orderBy("created_at", updatedOrder)
         .limit(1);
       const nextEvent = await dbClient("events")
         .select("created_at")
-        .where("id", id)
+        .where("user_id", userId)
         .andWhere("created_at", operator, lastEventType.created_at)
         .orderBy("created_at", updatedOrder)
         .limit(1);
@@ -496,7 +496,7 @@ const eventMutations = {
 
       if (!eventList.length)
         throw new GraphQLError(
-          "You do not have any associated events with provided id!"
+          "You do not have any events with associated id!"
         );
 
       const event = eventList[0];

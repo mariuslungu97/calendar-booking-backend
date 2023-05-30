@@ -93,7 +93,7 @@ const userFields = {
 
         const recentEventTypes = await dbClient("event_types")
           .select("*")
-          .where({ user_id: id })
+          .where("user_id", id)
           .orderBy("updated_at", "desc")
           .limit(3);
 
@@ -117,7 +117,7 @@ const userFields = {
 
         const recentPayments = await dbClient("payments")
           .select("*")
-          .where({ user_id: id })
+          .where("user_id", id)
           .orderBy("created_at", "desc")
           .limit(3);
 

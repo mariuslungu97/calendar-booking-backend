@@ -323,7 +323,7 @@ const eventTypeQueries = {
 
     try {
       const { dbClient } = ctx.services;
-      const { id } = req.session.user as TUserSessionData;
+      const { id: userId } = req.session.user as TUserSessionData;
       const { cursor, order, take } = params;
 
       const decodedCursor = Buffer.from(cursor, "base64").toString("ascii");
@@ -334,7 +334,7 @@ const eventTypeQueries = {
       const updatedOrder = isNext ? order : order === "DESC" ? "ASC" : "DESC";
       const eventTypes = await dbClient("event_types")
         .select("*")
-        .where("id", id)
+        .where("user_id", userId)
         .andWhere("updated_at", operator, timestamp)
         .orderBy("updated_at", updatedOrder)
         .limit(take);
@@ -350,13 +350,13 @@ const eventTypeQueries = {
 
       const prevEventType = await dbClient("event_types")
         .select("updated_at")
-        .where("id", id)
+        .where("user_id", userId)
         .andWhere("updated_at", operator, firstEventType.updated_at)
         .orderBy("updated_at", updatedOrder)
         .limit(1);
       const nextEventType = await dbClient("event_types")
         .select("updated_at")
-        .where("id", id)
+        .where("user_id", userId)
         .andWhere("updated_at", operator, lastEventType.updated_at)
         .orderBy("updated_at", updatedOrder)
         .limit(1);
@@ -595,6 +595,8 @@ const eventTypeMutations = {
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
 
+      const { id: userId } = req.session.user as TUserSessionData;
+
       await eventTypeUpdateParamsValidationSchema.validateAsync(params);
 
       const { dbClient } = ctx.services;
@@ -603,6 +605,7 @@ const eventTypeMutations = {
 
       const updatedEventType = await dbClient("event_types")
         .where("id", eventTypeId)
+        .andWhere("user_id", userId)
         .update(
           {
             name,
@@ -616,6 +619,9 @@ const eventTypeMutations = {
           },
           "*"
         );
+
+      if (!updatedEventType.length)
+        throw new GraphQLError("You have no event type with associated id!");
 
       return updatedEventType[0];
     } catch (err) {
@@ -635,12 +641,17 @@ const eventTypeMutations = {
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
 
+      const { id: userId } = req.session.user as TUserSessionData;
       const { dbClient } = ctx.services;
       const { eventTypeId } = params;
 
       const deletedEventType = await dbClient("event_types")
         .delete("*")
-        .where("id", eventTypeId);
+        .where("id", eventTypeId)
+        .andWhere("user_id", userId);
+
+      if (!deletedEventType.length)
+        throw new GraphQLError("You have no event type with associated id!");
 
       return deletedEventType[0];
     } catch (err) {
@@ -667,10 +678,15 @@ const eventTypeMutations = {
       const { eventTypeId, params: updateParams } = params;
       const { schedule } = updateParams;
 
-      // delete the schedule with its associated periods
-      const eventType = (
-        await dbClient("event_types").select("*").where("id", eventTypeId)
-      )[0];
+      // check if event type with id belongs to user
+      const eventTypeList = await dbClient("event_types")
+        .select("*")
+        .where("id", eventTypeId)
+        .andWhere("user_id", userId);
+      if (!eventTypeList.length)
+        throw new GraphQLError("You have no event type with associated id!");
+
+      const eventType = eventTypeList[0];
       const eventTypeScheduleId = eventType.schedule_id;
 
       // delete schedule and associated periods
@@ -722,6 +738,15 @@ const eventTypeMutations = {
       const { id: userId } = req.session.user as TUserSessionData;
       const { dbClient, stripeApi } = ctx.services;
 
+      // check if event type with id belongs to user
+      const { eventTypeId } = params;
+      const existingEventTypeList = await dbClient("event_types")
+        .select("id")
+        .where("id", eventTypeId)
+        .andWhere("user_id", userId);
+      if (!existingEventTypeList.length)
+        throw new GraphQLError("You have no event type with associated id!");
+
       // check if user is connected to stripe
       const user = (
         await dbClient("users").select("stripe_account_id").where("id", userId)
@@ -749,7 +774,7 @@ const eventTypeMutations = {
 
       await eventTypeUpdatePaymentParamsValidationSchema.validateAsync(params);
 
-      const { eventTypeId, params: updateParams } = params;
+      const { params: updateParams } = params;
       const { collectsPayments, paymentFee } = updateParams;
 
       const eventType = (
@@ -815,6 +840,7 @@ const eventTypeMutations = {
       const { req } = ctx;
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
+      const { id: userId } = req.session.user as TUserSessionData;
 
       await eventTypeUpdateQuestionsParamsValidationSchema.validateAsync(
         params
@@ -822,6 +848,14 @@ const eventTypeMutations = {
 
       const { dbClient } = ctx.services;
       const { eventTypeId, params: updateParams } = params;
+
+      const eventTypeList = await dbClient("event_types")
+        .select("id")
+        .where("id", eventTypeId)
+        .andWhere("user_id", userId);
+      if (!eventTypeList.length)
+        throw new GraphQLError("You have no event type with associated id!");
+
       const { questions } = updateParams;
 
       const eventQuestions = await dbClient("event_type_questions")
