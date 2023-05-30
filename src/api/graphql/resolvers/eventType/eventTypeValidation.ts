@@ -1,21 +1,9 @@
 import Joi from "joi";
 
+import { isValidTimeZone } from "../../../../utils";
+
 const validLocationTypes = ["G_MEET", "ADDRESS", "PHONE"];
 const validQuestionTypes = ["TEXT", "RADIO", "CHECKBOX"];
-
-// https://stackoverflow.com/questions/44115681/javascript-check-if-timezone-name-valid-or-not
-const isValidTimeZone = (tz: string) => {
-  if (!Intl || !Intl.DateTimeFormat().resolvedOptions().timeZone) {
-    throw new Error("Time zones are not available in this environment");
-  }
-
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: tz });
-    return true;
-  } catch (ex) {
-    return false;
-  }
-};
 
 const availableTimesParamsValidationSchema = Joi.object({
   date: Joi.string()

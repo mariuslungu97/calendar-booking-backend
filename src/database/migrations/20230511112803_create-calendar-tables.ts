@@ -268,8 +268,6 @@ export async function up(knex: Knex): Promise<void> {
                   .primary()
                   .defaultTo(knex.raw("uuid_generate_v4()"));
 
-                table.string("google_id").notNullable();
-
                 table.uuid("user_id");
                 table
                   .foreign("user_id")
@@ -291,7 +289,8 @@ export async function up(knex: Knex): Promise<void> {
                   .inTable("event_schedule")
                   .onDelete("RESTRICT");
 
-                table.string("google_link").notNullable();
+                table.string("google_id").nullable();
+                table.string("google_link").nullable();
               });
             }
           });
@@ -364,7 +363,7 @@ export async function up(knex: Knex): Promise<void> {
                 table
                   .foreign("event_schedule_id")
                   .references("id")
-                  .inTable("event_schedule")
+                  .inTable("event_schedules")
                   .onDelete("RESTRICT");
 
                 table.enu(
@@ -379,9 +378,13 @@ export async function up(knex: Knex): Promise<void> {
 
                 table.string("user_timezone").notNullable();
                 table.string("invitee_timezone").notNullable();
-                table.string("location_value").notNullable();
 
-                table.timestamps(true, true);
+                table.string("location_value");
+
+                table
+                  .timestamp("created_at")
+                  .defaultTo(knex.fn.now())
+                  .notNullable();
                 table.timestamp("cancelled_at");
               });
             }

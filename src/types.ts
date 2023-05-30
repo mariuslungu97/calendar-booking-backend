@@ -89,7 +89,7 @@ export type TOAuthConnectionUpdateParams = Partial<
   Omit<OAuthConnection, "user_id" | "provider" | "created_at">
 >;
 
-export type TEventTypeLocationType = "G_MEET" | "ADDRESS" | "HOME";
+export type TEventTypeLocationType = "G_MEET" | "ADDRESS" | "PHONE";
 export interface EventType {
   id: string;
   user_id?: string | null;
@@ -154,17 +154,17 @@ export type TEventScheduleUpdateParams = Partial<Omit<EventSchedule, "id">>;
 
 export interface CalendarEvent {
   id: string;
-  google_id: string;
   user_id: string;
   event_schedule_id: string;
   event_id?: string | null;
-  google_link: string;
+  google_id?: string | null;
+  google_link?: string | null;
 }
 export type TCalendarEventCreateInput = Omit<CalendarEvent, "id">;
 export type TCalendarEventUpdateParams = Partial<
   Omit<
     CalendarEvent,
-    "id" | "google_id" | "user_id" | "schedule_id" | "event_id"
+    "id" | "google_id" | "user_id" | "event_schedule_id" | "event_id"
   >
 >;
 
@@ -177,7 +177,7 @@ export interface Payment {
   status: TPaymentStatusType;
   total_fee: number;
   application_fee: number;
-  processor_payload: object;
+  processor_payload: string;
   created_at: string;
   updated_at: string;
 }
@@ -200,17 +200,16 @@ export interface Event {
   user_id?: string | null;
   event_type_id: string;
   event_schedule_id: string;
-  payment_id: string;
+  payment_id?: string | null;
   status: TEventStatusType;
   user_email: string;
   invitee_email: string;
   invitee_full_name: string;
   user_timezone: string;
   invitee_timezone: string;
-  location_value: string;
+  location_value?: string | null;
   cancelled_at?: string | null;
   created_at: string;
-  updated_at: string;
 }
 export type TEventCreateInput = Omit<Event, "id" | "created_at">;
 export type TEventUpdateParams = Partial<
@@ -287,7 +286,7 @@ type TCreateEventInputAttendee = {
 };
 
 type TCreateEventInputLocation = {
-  type: "G_MEET" | "PHONE" | "ADDRESS";
+  type: TEventTypeLocationType;
   value?: string;
 };
 

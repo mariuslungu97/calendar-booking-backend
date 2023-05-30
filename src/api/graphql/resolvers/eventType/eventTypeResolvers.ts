@@ -30,7 +30,15 @@ import {
 } from "../../../../types";
 import { isLoggedIn } from "../../../middleware/auth";
 
+interface QuestionInput {
+  type: TEventTypeQuestionType;
+  isOptional: boolean;
+  label: string;
+  possibleAnswers: string[] | null;
+}
+
 interface Question {
+  id: string;
   type: TEventTypeQuestionType;
   isOptional: boolean;
   label: string;
@@ -82,7 +90,7 @@ interface CreateEventTypeInputParams {
   paymentFee?: number;
   schedule: Schedule;
   location: Location;
-  questions: Question[];
+  questions: QuestionInput[];
 }
 
 interface UpdateEventTypeParams {
@@ -107,7 +115,7 @@ interface UpdateEventTypeScheduleParams {
 
 interface UpdateEventTypeQuestionsParams {
   eventTypeId: string;
-  params: { questions: Question[] };
+  params: { questions: QuestionInput[] };
 }
 
 interface UpdateEventTypePaymentParams {
@@ -147,6 +155,7 @@ const commonEventTypeFields = {
           .map((question) => question.value);
 
         return {
+          id: question.id,
           type: question.type,
           label: question.label,
           isOptional: question.is_optional,
@@ -324,6 +333,7 @@ const eventTypeQueries = {
       // reverse orders if we're going back
       const updatedOrder = isNext ? order : order === "DESC" ? "ASC" : "DESC";
       const eventTypes = await dbClient("event_types")
+        .select("*")
         .where("id", id)
         .andWhere("updated_at", operator, timestamp)
         .orderBy("updated_at", updatedOrder)
@@ -339,11 +349,13 @@ const eventTypeQueries = {
       const lastEventType = eventTypes[eventTypes.length - 1];
 
       const prevEventType = await dbClient("event_types")
+        .select("updated_at")
         .where("id", id)
         .andWhere("updated_at", operator, firstEventType.updated_at)
         .orderBy("updated_at", updatedOrder)
         .limit(1);
       const nextEventType = await dbClient("event_types")
+        .select("updated_at")
         .where("id", id)
         .andWhere("updated_at", operator, lastEventType.updated_at)
         .orderBy("updated_at", updatedOrder)
@@ -448,6 +460,14 @@ const eventTypeMutations = {
         questions,
         description,
       } = params;
+
+      if (location.type === "G_MEET") {
+        const { oAuthStoreApi } = ctx.services;
+        if (!oAuthStoreApi.getClient(userId))
+          throw new GraphQLError(
+            "You cannot generate Google Meet links for your events without being connected to Google!"
+          );
+      }
 
       let stripeProductId: string | null = null;
       let stripePriceId: string | null = null;

@@ -10,11 +10,11 @@ const createAccountValidationSchema = Joi.object({
   email: Joi.string().email().required(),
   firstName: Joi.string()
     .max(30)
-    .pattern(/^[a-zA-Z\s]*$/)
+    .pattern(new RegExp(/^[a-zA-Z\s]*$/))
     .required(),
   lastName: Joi.string()
     .max(30)
-    .pattern(/^[a-zA-Z\s]*$/)
+    .pattern(new RegExp(/^[a-zA-Z\s]*$/))
     .required(),
   password: Joi.string()
     .max(100)

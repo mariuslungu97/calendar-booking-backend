@@ -1,4 +1,21 @@
 const graphQlTypeDefs = `
+
+  enum PaginationOrderType {
+    ASC,
+    DESC
+  }
+
+  type PageInfo {
+    nextPage: String
+    previousPage: String
+    order: PaginationOrderType!
+    take: Int!
+  }
+
+  """
+    User related types/inputs: User, UserCreateInput
+  """
+
   type User {
     username: String!
     email: String!
@@ -19,6 +36,18 @@ const graphQlTypeDefs = `
     lastName: String!
   }
 
+  """
+    EventType related types/inputs/enums: 
+      - SchedulePeriod, Schedule
+      - QuestionType, EventTypeQuestion, EventTypeQuestionInput
+      - LocationType, EventTypeLocation
+      - AvailableTimeSlot, AvailableDate, AvailableDates
+      - EventType, VisitorEventType, UserEventType
+      - EventTypeCreateInput, EventTypeUpdateInput
+      - EventTypeUpdateScheduleInput, EventTypeUpdatePaymentInput, EventTypeUpdateQuestionsInput
+      - EventTypeConnections
+  """
+
   type SchedulePeriod {
     day: Int!
     startTime: String!
@@ -37,6 +66,14 @@ const graphQlTypeDefs = `
   }
 
   type EventTypeQuestion {
+    id: String!
+    type: QuestionType!
+    label: String!
+    isOptional: Boolean!
+    possibleAnswers: [String!]
+  }
+
+  input EventTypeQuestionInput {
     type: QuestionType!
     label: String!
     isOptional: Boolean!
@@ -48,6 +85,7 @@ const graphQlTypeDefs = `
     PHONE,
     ADDRESS
   }
+
   type EventTypeLocation {
     type: LocationType!
     value: String
@@ -98,7 +136,7 @@ const graphQlTypeDefs = `
     collectsPayments: Boolean!
     description: String
     paymentFee: Float
-    questions: [EventTypeQuestion!]!
+    questions: [EventTypeQuestionInput!]!
     schedule: Schedule!
     location: EventTypeLocation!
   }
@@ -121,11 +159,25 @@ const graphQlTypeDefs = `
   }
 
   input EventTypeUpdateQuestionsInput {
-    questions: [EventTypeQuestion!]!
+    questions: [EventTypeQuestionInput!]!
   }
 
+  type EventTypeConnections {
+    pageInfo: PageInfo!
+    edges: [EventType!]!
+  }
+
+  """
+    Event related types/inputs:
+      - EventAnswer, EventStatusType
+      - Event
+      - EventCreateInput
+      - EventUpdateTimeInput
+      - EventConnections
+  """
+
   type EventAnswer {
-    question: EventTypeQuestion!
+    questionId: String!
     answer: [String!]!
   }
 
@@ -135,6 +187,7 @@ const graphQlTypeDefs = `
     CANCELLED,
     FAILED_PAYMENT
   }
+
   type Event {
     id: String!
     status: EventStatusType!
@@ -152,10 +205,10 @@ const graphQlTypeDefs = `
   input EventCreateInput {
     inviteeEmail: String!
     inviteeFullName: String!
+    inviteeTimezone: String!
     startDateTime: String!
     endDateTime: String!
     answers: [EventAnswer!]!
-    visitorTimezone: String!
   }
 
   input EventUpdateTimeInput {
@@ -163,46 +216,34 @@ const graphQlTypeDefs = `
     endDateTime: String!
   }
 
-  enum PaymentStatus {
+  type EventConnections {
+    pageInfo: PageInfo!
+    edges: [Event!]!
+  }
+
+  """
+    Payment related types/inputs: PaymentStatusType, Payment, PaymentConnections
+  """
+
+  enum PaymentStatusType {
     WAITING,
     SUCCESS,
     FAIL
   }
+
   type Payment {
     id: String!
-    status: PaymentStatus!
+    status: PaymentStatusType!
     payload: String!
     createdAt: String!
     updatedAt: String!
-  }
-
-  enum PaginationOrder {
-    ASC,
-    DESC
-  }
-
-  type PageInfo {
-    nextPage: String
-    previousPage: String
-    order: PaginationOrder!
-    take: Int!
-  }
-
-  type EventTypeConnections {
-    pageInfo: PageInfo!
-    edges: [EventType!]!
-  }
-
-  type EventConnections {
-    pageInfo: PageInfo!
-    edges: [Event!]!
   }
 
   type PaymentConnections {
     info: PageInfo!
     edges: [Payment!]!
   }
-  
+
   type CreateAccountResponse {
     message: String!
   }
@@ -241,9 +282,9 @@ const graphQlTypeDefs = `
     updateEventTypeSchedule(eventTypeId: String!, params: EventTypeUpdateScheduleInput!): EventType!
     updateEventTypePayment(eventTypeId: String!, params: EventTypeUpdatePaymentInput!): EventType!
     deleteEventType(eventTypeId: String!): EventType!
-    bookEvent(params: EventCreateInput!): BookEventResponse!
+    bookEvent(username: String!, eventTypeLink: String!, params: EventCreateInput!): BookEventResponse!
+    updateEventTime(eventId: String!, params: EventUpdateTimeInput!): Event!
     cancelEvent(eventId: String!): Event!
-    deleteEvent(eventId: String!): Event!
   }
 `;
 
