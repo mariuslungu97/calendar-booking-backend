@@ -57,6 +57,14 @@ const config = {
       process.env.STRIPE_PAYMENT_SUCCESS_URI || "/stripe/payments/success",
     paymentCancelUri:
       process.env.STRIPE_PAYMENT_CANCEL_URI || "/stripe/payments/cancel",
+    accountUpdateEventUri:
+      process.env.STRIPE_ACCOUNT_UPDATE_EVENT_URI || "/stripe/events/account",
+    sessionSuccessEventUri:
+      process.env.STRIPE_SESSION_SUCCESS_EVENT_URI ||
+      "/stripe/events/session/success",
+    sessionFailureEventUri:
+      process.env.STRIPE_SESSION_FAILURE_EVENT_URI ||
+      "/stripe/events/session/failure",
   },
   graphql: {
     path: process.env.APP_GRAPHQL_PATH || "graphql",

@@ -7,23 +7,12 @@ import syncApi from "../../services/calendarSync";
 import oAuthApi from "../../services/googleOAuth";
 import googleAuthStore from "../../services/googleAuthClients";
 
-import { IRestApiResponse, TUserSessionData } from "../../types";
+import { IRestApiResponse } from "../../types";
 
 type TOAuthHandlerParams = {
   error?: string;
   code?: string;
   state?: string;
-};
-
-const oAuthHandler = (req: Request, res: Response) => {
-  const userSession = req.session.user as TUserSessionData;
-  const authState = { userId: userSession };
-  const encodedState = Buffer.from(JSON.stringify(authState)).toString(
-    "base64url"
-  );
-  let authUrl = oAuthApi.generateOAuthUrl();
-  authUrl += `state=${encodedState}`;
-  return res.status(303).redirect(authUrl);
 };
 
 const oAuthCallbackHandler = async (
@@ -101,4 +90,4 @@ const calendarEventHandler = async (req: Request, res: Response) => {
   syncApi.addOneTimeSyncJob("incrementalSync", userId, { userId });
 };
 
-export { oAuthHandler, oAuthCallbackHandler, calendarEventHandler };
+export { oAuthCallbackHandler, calendarEventHandler };

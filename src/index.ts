@@ -3,6 +3,7 @@ import express from "express";
 import yoga from "./loaders/graphql";
 import config from "./config";
 import googleRouter from "./api/routes/googleRoutes";
+import stripeRouter from "./api/routes/stripeRoutes";
 import googleAuthStore from "./services/googleAuthClients";
 
 import fullSyncCalendarWorker from "./workers/fullSync";
@@ -19,6 +20,7 @@ const { port } = config.app;
 const app = express();
 
 app.use("/api", googleRouter);
+app.use("/api", stripeRouter);
 app.use(yoga.graphqlEndpoint, yoga);
 
 app.listen(port, async () => {
