@@ -5,11 +5,8 @@ import getTransporter from "../loaders/nodemailer";
 import redisConnection from "../loaders/redis";
 import logger from "../loaders/logger";
 
-import {
-  readHTMLFile,
-  generateJwtLink,
-  generateMailFields,
-} from "../utils/mail";
+import { signPayloadJwt } from "../utils";
+import { readHTMLFile, generateMailFields } from "../utils/mail";
 
 import { TMailJobData } from "../types";
 
@@ -30,7 +27,7 @@ const process = async (job: Job<TMailJobData>) => {
 
     let allHtmlReplacements = { ...htmlReplacements };
     if (type !== "CANCEL_EVENT") {
-      const jwtToken = await generateJwtLink(jwtPayload, linkExpirationDate);
+      const jwtToken = await signPayloadJwt(jwtPayload, linkExpirationDate);
 
       const link = linkUri + jwtToken;
       allHtmlReplacements = { ...htmlReplacements, link };

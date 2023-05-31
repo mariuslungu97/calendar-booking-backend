@@ -1,5 +1,4 @@
 import fs from "fs";
-import jwt from "jsonwebtoken";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -28,7 +27,7 @@ type TGenMailFieldsResponse = {
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const { name, jwtSecret, uri } = config.app;
+const { name, uri } = config.app;
 
 const readHTMLFile = async (filePath: string): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -36,25 +35,6 @@ const readHTMLFile = async (filePath: string): Promise<string> => {
       if (error) reject(error);
       else resolve(data);
     });
-  });
-};
-
-const generateJwtLink = async (
-  payload: object,
-  expirationDate: number
-): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    jwt.sign(
-      payload,
-      jwtSecret,
-      { expiresIn: expirationDate },
-      (error, token) => {
-        if (error || !token) {
-          if (!token) reject(new Error("Couldn't retrieve token!"));
-          else reject(error);
-        } else resolve(token);
-      }
-    );
   });
 };
 
@@ -196,4 +176,4 @@ const generateMailFields = (
   };
 };
 
-export { readHTMLFile, generateJwtLink, formatMailDate, generateMailFields };
+export { readHTMLFile, formatMailDate, generateMailFields };

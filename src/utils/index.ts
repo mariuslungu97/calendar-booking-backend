@@ -1,3 +1,40 @@
+import jwt from "jsonwebtoken";
+import config from "../config";
+
+const { jwtSecret } = config.app;
+
+const signPayloadJwt = (
+  payload: object,
+  expirationDate: number
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    jwt.sign(
+      payload,
+      jwtSecret,
+      { expiresIn: expirationDate },
+      (error, token) => {
+        if (error || !token) {
+          if (!token) reject(new Error("Couldn't retrieve token!"));
+          else reject(error);
+        } else resolve(token);
+      }
+    );
+  });
+};
+
+const decodeJwtString = (
+  encodedJwt: string
+): Promise<string | jwt.JwtPayload> => {
+  return new Promise((resolve, reject) => {
+    jwt.verify(encodedJwt, jwtSecret, (err, decoded) => {
+      if (err || !decoded) {
+        if (!decoded) reject(new Error("Couldn't retrieve decoded!"));
+        else reject(err);
+      } else resolve(decoded);
+    });
+  });
+};
+
 const randomString = (length: number) => {
   let result = "";
   const characters =
@@ -37,4 +74,10 @@ const areArraysEqual = (arr1: number[], arr2: number[]) => {
   return true;
 };
 
-export { randomString, isValidTimeZone, areArraysEqual };
+export {
+  signPayloadJwt,
+  decodeJwtString,
+  randomString,
+  isValidTimeZone,
+  areArraysEqual,
+};
