@@ -1,10 +1,9 @@
 import knexClient from "../loaders/knex";
-import Redis from "ioredis";
 
 import oAuthApi from "./googleOAuth";
 import googleAuthStore from "./googleAuthClients";
 import logger from "../loaders/logger";
-import config from "../config";
+import redisConnection from "../loaders/redis";
 
 import {
   IGoogleAuthClientsPubSubApi,
@@ -14,21 +13,10 @@ import {
 // TODO think of how you can avoid echoed calls to .publish
 // in the .addClient and .deleteClient methods
 
-const { host, port, user, password } = config.redis;
 const authClientsChannelName = "authClientsChannel";
 
-const authClientsPublisher = new Redis({
-  host,
-  port,
-  username: user,
-  password,
-});
-const authClientsSubscriber = new Redis({
-  host,
-  port,
-  username: user,
-  password,
-});
+const authClientsPublisher = redisConnection();
+const authClientsSubscriber = redisConnection();
 
 authClientsSubscriber.subscribe(authClientsChannelName, (err) => {
   if (err) {

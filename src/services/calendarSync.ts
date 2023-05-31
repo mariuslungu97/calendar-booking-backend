@@ -1,8 +1,9 @@
-import { Queue, ConnectionOptions, JobsOptions } from "bullmq";
+import { Queue, JobsOptions } from "bullmq";
 
 import calendarApi from "./googleCalendar";
 import googleAuthStore from "./googleAuthClients";
 
+import redisConnection from "../loaders/redis";
 import logger from "../loaders/logger";
 import config from "../config";
 
@@ -15,25 +16,17 @@ const stopQueueRepeatableJob = async (queue: Queue, jobId: string) => {
   await queue.removeRepeatableByKey(repeatableJob.key);
 };
 
-const { host, port, user, password } = config.redis;
-const connection: ConnectionOptions = {
-  host,
-  port,
-  password,
-  username: user,
-};
-
 const fullSyncQueue = new Queue<TSyncJob>(
   "calendarFullSync", // eslint-disable-line
-  { connection }
+  { connection: redisConnection() }
 );
 const incrementalSyncQueue = new Queue<TSyncJob>(
   "calendarIncrementalSync", // eslint-disable-line
-  { connection }
+  { connection: redisConnection() }
 );
 const notificationChannelsRefreshQueue = new Queue<TSyncJob>(
   "refreshNotificationChannels", // eslint-disable-line
-  { connection }
+  { connection: redisConnection() }
 );
 
 const startSyncRoutine = async (userId: string) => {

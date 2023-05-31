@@ -6,11 +6,13 @@ import googleRouter from "./api/routes/googleRoutes";
 import stripeRouter from "./api/routes/stripeRoutes";
 import googleAuthStore from "./services/googleAuthClients";
 
+import mailTransportWorker from "./workers/mailTransport";
 import fullSyncCalendarWorker from "./workers/fullSync";
 import incrementalSyncCalendarWorker from "./workers/incrementalSync";
 import refreshNotificationChannelsWorker from "./workers/refreshNotificationsChannel";
 
 const startWorkers = async () => {
+  await mailTransportWorker.run();
   await fullSyncCalendarWorker.run();
   await incrementalSyncCalendarWorker.run();
   await refreshNotificationChannelsWorker.run();

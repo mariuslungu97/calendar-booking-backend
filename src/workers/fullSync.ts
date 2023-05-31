@@ -1,5 +1,6 @@
 import { Worker, Job } from "bullmq";
 
+import redisConnection from "../loaders/redis";
 import logger from "../loaders/logger";
 import knexClient from "../loaders/knex";
 import calendarApi from "../services/googleCalendar";
@@ -46,6 +47,7 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
 const fullSyncWorker = new Worker<TSyncJob>("calendarFullSync", processor, {
   concurrency: 10,
   autorun: false,
+  connection: redisConnection(),
 });
 
 export default fullSyncWorker;

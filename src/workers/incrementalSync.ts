@@ -1,5 +1,6 @@
 import { Worker, Job } from "bullmq";
 
+import redisConnection from "../loaders/redis";
 import logger from "../loaders/logger";
 import knexClient from "../loaders/knex";
 import calendarApi from "../services/googleCalendar";
@@ -70,6 +71,7 @@ const incrementalSyncWorker = new Worker<TSyncJob>(
   {
     concurrency: 10,
     autorun: false,
+    connection: redisConnection(),
   }
 );
 

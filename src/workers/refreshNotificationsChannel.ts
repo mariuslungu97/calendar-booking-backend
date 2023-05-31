@@ -6,6 +6,7 @@ import googleAuthStore from "../services/googleAuthClients";
 
 import config from "../config";
 import logger from "../loaders/logger";
+import redisConnection from "../loaders/redis";
 
 import { TSyncJob } from "../types";
 
@@ -51,6 +52,7 @@ const refreshNotificationChannelsWorker = new Worker(
   {
     concurrency: 2,
     autorun: false,
+    connection: redisConnection(),
   }
 );
 

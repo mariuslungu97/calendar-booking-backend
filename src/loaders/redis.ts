@@ -4,11 +4,12 @@ import config from "../config";
 
 const { host, port, user, password } = config.redis;
 
-const redisClient = new Redis({
-  host,
-  port,
-  username: user,
-  password,
-});
+const redisConnection = () =>
+  new Redis({
+    host,
+    port,
+    password,
+    username: user,
+  });
 
-export default redisClient;
+export default redisConnection;

@@ -1,6 +1,9 @@
 import { Worker, Job } from "bullmq";
 import handlebars from "handlebars";
+
 import getTransporter from "../loaders/nodemailer";
+import redisConnection from "../loaders/redis";
+import logger from "../loaders/logger";
 
 import {
   readHTMLFile,
@@ -9,7 +12,6 @@ import {
 } from "../utils/mail";
 
 import { TMailJobData } from "../types";
-import logger from "../loaders/logger";
 
 const process = async (job: Job<TMailJobData>) => {
   const { to, type, payload } = job.data;
@@ -56,6 +58,7 @@ const process = async (job: Job<TMailJobData>) => {
 const mailTransportWorker = new Worker("emailsTransport", process, {
   autorun: false,
   concurrency: 2,
+  connection: redisConnection(),
 });
 
 export default mailTransportWorker;

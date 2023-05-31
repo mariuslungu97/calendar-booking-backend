@@ -1,20 +1,11 @@
-import { Queue, ConnectionOptions } from "bullmq";
+import { Queue } from "bullmq";
 import logger from "../loaders/logger";
-
-import config from "../config";
+import redisConnection from "../loaders/redis";
 
 import { IMailService, TSendMailParams, TMailJobData } from "../types";
 
-const { host, port, user, password } = config.redis;
-const connection: ConnectionOptions = {
-  host,
-  port,
-  password,
-  username: user,
-};
-
 const emailsTransportQueue = new Queue<TMailJobData>("emailsTransport", {
-  connection,
+  connection: redisConnection(),
 });
 
 const sendMail = async (params: TSendMailParams) => {
