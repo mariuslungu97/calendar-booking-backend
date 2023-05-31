@@ -2,6 +2,7 @@ import express from "express";
 
 import config from "./config";
 import yoga from "./loaders/graphql";
+import authRouter from "./api/routes/authRoutes";
 import googleRouter from "./api/routes/googleRoutes";
 import stripeRouter from "./api/routes/stripeRoutes";
 import googleAuthStore from "./services/googleAuthClients";
@@ -21,13 +22,13 @@ const startWorkers = async () => {
 const { port } = config.app;
 const app = express();
 
+app.use("/api", authRouter);
 app.use("/api", googleRouter);
 app.use("/api", stripeRouter);
 app.use(yoga.graphqlEndpoint, yoga);
 
 app.listen(port, async () => {
   console.log(`Listening on port ${port}!`);
-  console.log("hello");
 
   await googleAuthStore.hydrateStore();
   await startWorkers();
