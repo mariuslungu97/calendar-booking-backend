@@ -64,109 +64,112 @@ interface EventConnections {
 }
 
 const eventFields = {
-  inviteeEmail: (parent: Event) => parent.invitee_email,
-  inviteeFullName: (parent: Event) => parent.invitee_full_name,
-  locationValue: (parent: Event) => parent.location_value,
-  createdAt: (parent: Event) => parent.created_at,
-  cancelledAt: (parent: Event) => parent.cancelled_at || null,
-  startDateTime: async (
-    parent: Event,
-    _: any,
-    ctx: GraphQlContext
-  ): Promise<string> => {
-    try {
-      const { event_schedule_id } = parent;
-      const { dbClient } = ctx.services;
+  Event: {
+    inviteeEmail: (parent: Event) => parent.invitee_email,
+    inviteeFullName: (parent: Event) => parent.invitee_full_name,
+    locationValue: (parent: Event) => parent.location_value as string,
+    createdAt: (parent: Event) => parent.created_at,
+    cancelledAt: (parent: Event) => parent.cancelled_at || null,
+    startDateTime: async (
+      parent: Event,
+      _: any,
+      ctx: GraphQlContext
+    ): Promise<string> => {
+      try {
+        const { event_schedule_id } = parent;
+        const { dbClient } = ctx.services;
 
-      const eventStartDateTime = (
-        await dbClient("event_schedules")
-          .select("start_date_time")
-          .where("id", event_schedule_id)
-      )[0].start_date_time;
+        const eventStartDateTime = (
+          await dbClient("event_schedules")
+            .select("start_date_time")
+            .where("id", event_schedule_id)
+        )[0].start_date_time;
 
-      return eventStartDateTime;
-    } catch (err) {
-      return handleGraphqlError(err, {
-        server: "Event.startDateTime resolver error",
-        client: "Unexpected error trying to retrieve event's start date time!",
-      });
-    }
-  },
-  endDateTime: async (
-    parent: Event,
-    _: any,
-    ctx: GraphQlContext
-  ): Promise<string> => {
-    try {
-      const { event_schedule_id } = parent;
-      const { dbClient } = ctx.services;
-
-      const eventEndDateTime = (
-        await dbClient("event_schedules")
-          .select("end_date_time")
-          .where("id", event_schedule_id)
-      )[0].end_date_time;
-
-      return eventEndDateTime;
-    } catch (err) {
-      return handleGraphqlError(err, {
-        server: "Event.endDateTime resolver error",
-        client: "Unexpected error trying to retrieve event's end date time!",
-      });
-    }
-  },
-  answers: async (
-    parent: Event,
-    _: any,
-    ctx: GraphQlContext
-  ): Promise<EventAnswer[]> => {
-    try {
-      const { id } = parent;
-      const { dbClient } = ctx.services;
-      const eventAnswers = await dbClient("event_answers")
-        .select("*")
-        .where("event_id", id);
-      let responseObj = {} as { [id: string]: EventAnswer };
-
-      // group by question_id
-      for (const eventAnswer of eventAnswers) {
-        const questionId = eventAnswer.question_id;
-        if (!(questionId in responseObj)) {
-          responseObj[questionId] = {
-            questionId,
-            answers: [eventAnswer.value],
-          };
-        } else responseObj[questionId].answers.push(eventAnswer.value);
+        return eventStartDateTime;
+      } catch (err) {
+        return handleGraphqlError(err, {
+          server: "Event.startDateTime resolver error",
+          client:
+            "Unexpected error trying to retrieve event's start date time!",
+        });
       }
+    },
+    endDateTime: async (
+      parent: Event,
+      _: any,
+      ctx: GraphQlContext
+    ): Promise<string> => {
+      try {
+        const { event_schedule_id } = parent;
+        const { dbClient } = ctx.services;
 
-      return Object.values(responseObj);
-    } catch (err) {
-      return handleGraphqlError(err, {
-        server: "Event.answers resolver error",
-        client: "Unexpected error trying to retrieve event answers!",
-      });
-    }
-  },
-  payment: async (
-    parent: Event,
-    _: any,
-    ctx: GraphQlContext
-  ): Promise<Payment | null> => {
-    if (!parent.payment_id) return null;
+        const eventEndDateTime = (
+          await dbClient("event_schedules")
+            .select("end_date_time")
+            .where("id", event_schedule_id)
+        )[0].end_date_time;
 
-    try {
-      const { dbClient } = ctx.services;
-      const payment = (
-        await dbClient("payments").select("*").where("id", parent.payment_id)
-      )[0];
+        return eventEndDateTime;
+      } catch (err) {
+        return handleGraphqlError(err, {
+          server: "Event.endDateTime resolver error",
+          client: "Unexpected error trying to retrieve event's end date time!",
+        });
+      }
+    },
+    answers: async (
+      parent: Event,
+      _: any,
+      ctx: GraphQlContext
+    ): Promise<EventAnswer[]> => {
+      try {
+        const { id } = parent;
+        const { dbClient } = ctx.services;
+        const eventAnswers = await dbClient("event_answers")
+          .select("*")
+          .where("event_id", id);
+        let responseObj = {} as { [id: string]: EventAnswer };
 
-      return payment;
-    } catch (err) {
-      return handleGraphqlError(err, {
-        server: "Event.payment resolver error",
-        client: "Unexpected error trying to retrieve event payment!",
-      });
-    }
+        // group by question_id
+        for (const eventAnswer of eventAnswers) {
+          const questionId = eventAnswer.question_id;
+          if (!(questionId in responseObj)) {
+            responseObj[questionId] = {
+              questionId,
+              answers: [eventAnswer.value],
+            };
+          } else responseObj[questionId].answers.push(eventAnswer.value);
+        }
+
+        return Object.values(responseObj);
+      } catch (err) {
+        return handleGraphqlError(err, {
+          server: "Event.answers resolver error",
+          client: "Unexpected error trying to retrieve event answers!",
+        });
+      }
+    },
+    payment: async (
+      parent: Event,
+      _: any,
+      ctx: GraphQlContext
+    ): Promise<Payment | null> => {
+      if (!parent.payment_id) return null;
+
+      try {
+        const { dbClient } = ctx.services;
+        const payment = (
+          await dbClient("payments").select("*").where("id", parent.payment_id)
+        )[0];
+
+        return payment;
+      } catch (err) {
+        return handleGraphqlError(err, {
+          server: "Event.payment resolver error",
+          client: "Unexpected error trying to retrieve event payment!",
+        });
+      }
+    },
   },
 };
 
@@ -370,6 +373,18 @@ const eventMutations = {
           "*"
         )
       )[0];
+
+      // create event answers
+      const eventAnswersFields = answers
+        .map((answer) => {
+          return answer.answers.map((value) => ({
+            event_id: event.id,
+            question_id: answer.questionId,
+            value,
+          }));
+        })
+        .flat();
+      await dbClient("event_answers").insert(eventAnswersFields);
 
       // create google calendar event if connected to Google
       let googleCalendarEvent: calendar_v3.Schema$Event | null = null;

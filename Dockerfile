@@ -11,5 +11,3 @@ RUN if [ "$NODE_ENV" = "development" ]; then npm install; else npm install --onl
 COPY . .
 
 EXPOSE 5050
-
-CMD ["node", "./dist/index.js"]

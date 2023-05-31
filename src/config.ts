@@ -71,7 +71,7 @@ const config = {
       "/stripe/events/session/failure",
   },
   graphql: {
-    path: process.env.APP_GRAPHQL_PATH || "graphql",
+    path: process.env.APP_GRAPHQL_PATH || "/graphql",
   },
 };
 

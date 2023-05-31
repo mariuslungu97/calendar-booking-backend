@@ -26,6 +26,10 @@ const schema = createSchema({
 const yoga = createYoga({
   schema,
   graphqlEndpoint: path,
+  cors: {
+    origin: "*",
+    methods: ["POST"],
+  },
   context: (yogaContext) => {
     const { req, res } = yogaContext as YogaInitialContext & {
       req: Request;

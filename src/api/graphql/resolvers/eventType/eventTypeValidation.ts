@@ -15,7 +15,11 @@ const availableTimesParamsValidationSchema = Joi.object({
 const availableDatesParamsValidationSchema = Joi.object({
   month: Joi.string()
     .pattern(new RegExp(/^((0[1-9])|(1[0-2]))-(\d{4})$/))
-    .required(), // matches MM-YYYY
+    .required()
+    .messages({
+      "string.pattern.base":
+        "The provided month must adhere to the following format: 'MM-YYYY' !",
+    }),
   timezone: Joi.date().custom(isValidTimeZone).required(),
 });
 
@@ -43,10 +47,18 @@ const eventTypeScheduleValidationObj = Joi.object({
         day: Joi.number().integer().min(0).max(6).required(),
         startTime: Joi.string()
           .pattern(new RegExp(/^[0-2][0-3]:[0-5][0-9]$/))
-          .required(),
+          .required()
+          .messages({
+            "string.pattern.base":
+              "Your start and end times must adhere to the following format: 'HH:mm' !",
+          }),
         endTime: Joi.string()
           .pattern(new RegExp(/^[0-2][0-3]:[0-5][0-9]$/))
-          .required(),
+          .required()
+          .messages({
+            "string.pattern.base":
+              "Your start and end times must adhere to the following format: 'HH:mm' !",
+          }),
       })
     )
     .required(),
@@ -77,12 +89,20 @@ const eventTypeCreateInputValidationSchema = Joi.object({
   name: Joi.string()
     .max(100)
     .pattern(new RegExp(/^[a-zA-Z\s]*$/))
-    .required(), // only letters and spaces
+    .required()
+    .messages({
+      "string.pattern.base":
+        "The name can only include alphabetic characters and spaces!",
+    }),
   link: Joi.string()
     .min(3)
     .max(50)
     .pattern(new RegExp(/^[a-zA-Z0-9_-]*$/))
-    .required(),
+    .required()
+    .messages({
+      "string.pattern.base":
+        "The link can only include url-safe characters: a-z, A-Z, 0-9, underscores and hyphens!",
+    }),
   duration: Joi.number()
     .integer()
     .min(1)
@@ -101,7 +121,11 @@ const eventTypeUpdateParamsValidationSchema = Joi.object({
   params: Joi.object({
     name: Joi.string()
       .max(100)
-      .pattern(new RegExp(/^[a-zA-Z\s]*$/)),
+      .pattern(new RegExp(/^[a-zA-Z\s]*$/))
+      .messages({
+        "string.pattern.base":
+          "The name can only include alphabetic characters and spaces!",
+      }),
     duration: Joi.number()
       .integer()
       .min(1)

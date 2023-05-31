@@ -24,7 +24,7 @@ const graphQlTypeDefs = `
     is2FaActivated: Boolean!    
     createdAt: String!
     recentPayments: [Payment!]!               # returns 3 most recent received payments
-    recentEventTypes: [EventType!]!           # returns 3 most recent updated/created event types
+    recentEventTypes: [UserEventType!]!       # returns 3 most recent updated/created event types
     upcomingEvents: [Event!]!                 # returns 3 nearest upcoming events
   }
 
@@ -54,9 +54,20 @@ const graphQlTypeDefs = `
     endTime: String!
   }
 
+  input SchedulePeriodInput {
+    day: Int!
+    startTime: String!
+    endTime: String!
+  }
+
   type Schedule {
     timezone: String!
     periods: [SchedulePeriod!]!
+  }
+
+  input ScheduleInput {
+    timezone: String!
+    periods: [SchedulePeriodInput!]!
   }
 
   enum QuestionType {
@@ -91,6 +102,11 @@ const graphQlTypeDefs = `
     value: String
   }
 
+  input EventTypeLocationInput {
+    type: LocationType!
+    value: String
+  }
+
   type AvailableTimeSlot {
     startTime: String!
     endTime: String!
@@ -107,7 +123,7 @@ const graphQlTypeDefs = `
     dates: [AvailableDate!]!
   }
    
-  interface EventType {
+  type VisitorEventType {
     name: String!
     link: String!
     duration: Int!
@@ -115,17 +131,21 @@ const graphQlTypeDefs = `
     questions: [EventTypeQuestion!]!
     description: String
     paymentFee: Float
-  }
-
-  type VisitorEventType implements EventType {
     availableDates(month: String!, timezone: String!): AvailableDates!
     availableTimes(date: String!, timezone: String!): AvailableDate!
   }
 
-  type UserEventType implements EventType {
+  type UserEventType {
     id: String!
-    schedule: Schedule!
+    name: String!
+    link: String!
+    duration: Int!
+    collectsPayments: Boolean!
+    questions: [EventTypeQuestion!]!
+    description: String
+    paymentFee: Float
     isActive: Boolean!
+    schedule: Schedule!
     location: EventTypeLocation!
   }
 
@@ -137,8 +157,8 @@ const graphQlTypeDefs = `
     description: String
     paymentFee: Float
     questions: [EventTypeQuestionInput!]!
-    schedule: Schedule!
-    location: EventTypeLocation!
+    schedule: ScheduleInput!
+    location: EventTypeLocationInput!
   }
 
   input EventTypeUpdateInput {
@@ -146,7 +166,7 @@ const graphQlTypeDefs = `
     duration: Int
     isActive: Boolean
     description: String
-    location: EventTypeLocation
+    location: EventTypeLocationInput
   }
 
   input EventTypeUpdatePaymentInput {
@@ -155,7 +175,7 @@ const graphQlTypeDefs = `
   }
 
   input EventTypeUpdateScheduleInput {
-    schedule: Schedule!
+    schedule: ScheduleInput!
   }
 
   input EventTypeUpdateQuestionsInput {
@@ -164,7 +184,7 @@ const graphQlTypeDefs = `
 
   type EventTypeConnections {
     pageInfo: PageInfo!
-    edges: [EventType!]!
+    edges: [UserEventType!]!
   }
 
   """
@@ -177,6 +197,11 @@ const graphQlTypeDefs = `
   """
 
   type EventAnswer {
+    questionId: String!
+    answer: [String!]!
+  }
+
+  input EventAnswerInput {
     questionId: String!
     answer: [String!]!
   }
@@ -208,7 +233,7 @@ const graphQlTypeDefs = `
     inviteeTimezone: String!
     startDateTime: String!
     endDateTime: String!
-    answers: [EventAnswer!]!
+    answers: [EventAnswerInput!]!
   }
 
   input EventUpdateTimeInput {
@@ -259,29 +284,29 @@ const graphQlTypeDefs = `
   }
 
   type BookEventResponse {
-    message: string!
+    message: String!
   }
 
   type Query {
-    me(): User!
+    me: User!
     viewBookingInformation(username: String!, eventTypeLink: String!): VisitorEventType!
-    eventTypes(after: String = "", take: Int = 5, order: PaginationOrder = "DESC"): EventTypeConnections!
-    events(after: String = "", take: Int = 5, order: PaginationOrder = "DESC"): EventConnections!
-    payments(after: String = "", take: Int = 5, order: PaginationOrder = "DESC"): PaymentConnections!
+    eventTypes(after: String = "", take: Int = 5, order: PaginationOrderType = "DESC"): EventTypeConnections!
+    events(after: String = "", take: Int = 5, order: PaginationOrderType = "DESC"): EventConnections!
+    payments(after: String = "", take: Int = 5, order: PaginationOrderType = "DESC"): PaymentConnections!
   }
 
   type Mutation {
     createAccount(params: UserCreateInput!): CreateAccountResponse!
     login(email: String!, password: String!): LoginResponse!
-    activate2Fa(): User!
-    connectGoogleCalendar(): ConnectResponse!
-    connectStripe(): ConnectResponse!
-    createEventType(params: EventTypeCreateInput!): EventType!
-    updateEventType(eventTypeId: String!, params: EventTypeUpdateInput!): EventType!
-    updateEventTypeQuestions(eventTypeId: String!, params: EventTypeUpdateQuestionsInput!): EventType!
-    updateEventTypeSchedule(eventTypeId: String!, params: EventTypeUpdateScheduleInput!): EventType!
-    updateEventTypePayment(eventTypeId: String!, params: EventTypeUpdatePaymentInput!): EventType!
-    deleteEventType(eventTypeId: String!): EventType!
+    activate2Fa: User!
+    connectGoogleCalendar: ConnectResponse!
+    connectStripe: ConnectResponse!
+    createEventType(params: EventTypeCreateInput!): UserEventType!
+    updateEventType(eventTypeId: String!, params: EventTypeUpdateInput!): UserEventType!
+    updateEventTypeQuestions(eventTypeId: String!, params: EventTypeUpdateQuestionsInput!): UserEventType!
+    updateEventTypeSchedule(eventTypeId: String!, params: EventTypeUpdateScheduleInput!): UserEventType!
+    updateEventTypePayment(eventTypeId: String!, params: EventTypeUpdatePaymentInput!): UserEventType!
+    deleteEventType(eventTypeId: String!): UserEventType!
     bookEvent(username: String!, eventTypeLink: String!, params: EventCreateInput!): BookEventResponse!
     updateEventTime(eventId: String!, params: EventUpdateTimeInput!): Event!
     cancelEvent(eventId: String!): Event!

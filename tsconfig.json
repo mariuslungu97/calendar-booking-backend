@@ -24,6 +24,6 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": ["./src/**/*"],
+  "include": ["./src/**/*", "./src/mail_templates"],
   "exclude": ["node_modules"]
 }

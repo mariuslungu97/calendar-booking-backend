@@ -260,42 +260,6 @@ export async function up(knex: Knex): Promise<void> {
           });
         })
         .then(() => {
-          return knex.schema.hasTable("calendar_events").then((exists) => {
-            if (!exists) {
-              return knex.schema.createTable("calendar_events", (table) => {
-                table
-                  .uuid("id")
-                  .primary()
-                  .defaultTo(knex.raw("uuid_generate_v4()"));
-
-                table.uuid("user_id");
-                table
-                  .foreign("user_id")
-                  .references("id")
-                  .inTable("users")
-                  .onDelete("SET NULL");
-
-                table.uuid("event_id").nullable();
-                table
-                  .foreign("event_id")
-                  .references("id")
-                  .inTable("events")
-                  .onDelete("CASCADE");
-
-                table.uuid("event_schedule_id");
-                table
-                  .foreign("event_schedule_id")
-                  .references("id")
-                  .inTable("event_schedule")
-                  .onDelete("RESTRICT");
-
-                table.string("google_id").nullable();
-                table.string("google_link").nullable();
-              });
-            }
-          });
-        })
-        .then(() => {
           return knex.schema.hasTable("payments").then((exists) => {
             if (!exists) {
               return knex.schema.createTable("payments", (table) => {
@@ -392,14 +356,65 @@ export async function up(knex: Knex): Promise<void> {
           });
         })
         .then(() => {
+          return knex.schema.hasTable("calendar_events").then((exists) => {
+            if (!exists) {
+              return knex.schema.createTable("calendar_events", (table) => {
+                table
+                  .uuid("id")
+                  .primary()
+                  .defaultTo(knex.raw("uuid_generate_v4()"));
+
+                table.uuid("user_id");
+                table
+                  .foreign("user_id")
+                  .references("id")
+                  .inTable("users")
+                  .onDelete("SET NULL");
+
+                table.uuid("event_id").nullable();
+                table
+                  .foreign("event_id")
+                  .references("id")
+                  .inTable("events")
+                  .onDelete("CASCADE");
+
+                table.uuid("event_schedule_id");
+                table
+                  .foreign("event_schedule_id")
+                  .references("id")
+                  .inTable("event_schedules")
+                  .onDelete("RESTRICT");
+
+                table.string("google_id").nullable();
+                table.string("google_link").nullable();
+              });
+            }
+          });
+        })
+        .then(() => {
           return knex.schema.hasTable("event_answers").then((exists) => {
             if (!exists) {
               return knex.schema.createTable("event_answers", (table) => {
-                table.uuid("event_id");
-                table.uuid("question_id");
-                table.text("value").notNullable();
+                table
+                  .uuid("id")
+                  .primary()
+                  .defaultTo(knex.raw("uuid_generate_v4()"));
 
-                table.primary(["event_id", "question_id"]);
+                table.uuid("event_id");
+                table
+                  .foreign("event_id")
+                  .references("id")
+                  .inTable("events")
+                  .onDelete("CASCADE");
+
+                table.uuid("question_id");
+                table
+                  .foreign("question_id")
+                  .references("id")
+                  .inTable("event_type_questions")
+                  .onDelete("RESTRICT");
+
+                table.text("value").notNullable();
               });
             }
             return;
@@ -417,6 +432,7 @@ export async function down(knex: Knex): Promise<void> {
     "event_status_type",
   ];
   const tables = [
+    "stripe_accounts",
     "users",
     "oauth_connections",
     "schedules",
@@ -424,11 +440,11 @@ export async function down(knex: Knex): Promise<void> {
     "event_types",
     "event_type_questions",
     "event_type_question_possible_answers",
+    "event_schedules",
+    "payments",
     "events",
     "event_answers",
     "calendar_events",
-    "event_schedules",
-    "payments",
   ];
 
   return Promise.all(

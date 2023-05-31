@@ -11,17 +11,25 @@ const createAccountValidationSchema = Joi.object({
   firstName: Joi.string()
     .max(30)
     .pattern(new RegExp(/^[a-zA-Z\s]*$/))
-    .required(),
+    .required()
+    .messages({
+      "string.pattern.base":
+        "Your first name can only contain alphabetic characters!",
+    }),
   lastName: Joi.string()
     .max(30)
     .pattern(new RegExp(/^[a-zA-Z\s]*$/))
-    .required(),
-  password: Joi.string()
-    .max(100)
-    .pattern(new RegExp(/^(?=.*[a-z])(?=.*[A-Z])(?=.*d)[a-zA-Zd]{8,}$/))
     .required()
     .messages({
-      "string.pattern":
+      "string.pattern.base":
+        "Your first name can only contain alphabetic characters!",
+    }),
+  password: Joi.string()
+    .max(100)
+    .pattern(new RegExp(/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,}$/))
+    .required()
+    .messages({
+      "string.pattern.base":
         "You must provide a password with minimum 8 characters, with at least one uppercase letter, one lowercase letter and one number!",
     }),
 });

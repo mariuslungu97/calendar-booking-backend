@@ -217,13 +217,14 @@ export type TEventUpdateParams = Partial<
 >;
 
 export interface EventAnswer {
+  id: string;
   event_id: string;
   question_id: string;
   value: string;
 }
-export type TEventAnswerCreateInput = EventAnswer;
+export type TEventAnswerCreateInput = Omit<EventAnswer, "id">;
 export type TEventAnswerUpdateParams = Partial<
-  Omit<EventAnswer, "event_id" | "question_id">
+  Omit<EventAnswer, "id" | "event_id" | "question_id">
 >;
 
 /**

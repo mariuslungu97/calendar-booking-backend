@@ -164,7 +164,7 @@ const userMutations = {
       const { params: createParams } = params;
       await createAccountValidationSchema.validateAsync(createParams);
 
-      const { dbClient } = ctx.services;
+      const { dbClient, emailApi } = ctx.services;
       const { username, email, password, firstName, lastName } = createParams;
 
       const existingAccountList = await dbClient("users")
@@ -185,6 +185,12 @@ const userMutations = {
         first_name: firstName,
         last_name: lastName,
         password: cryptedPass,
+      });
+
+      emailApi.sendMail({
+        to: email,
+        type: "VERIFY_EMAIL",
+        payload: { userFirstName: firstName, username },
       });
 
       return {

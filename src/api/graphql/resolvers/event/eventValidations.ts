@@ -9,7 +9,11 @@ const bookEventParamsValidationSchema = Joi.object({
     inviteeEmail: Joi.string().email().required(),
     inviteeFullName: Joi.string()
       .pattern(new RegExp(/^[a-zA-Z\s]*$/))
-      .required(),
+      .required()
+      .messages({
+        "string.pattern.base":
+          "The name can only include alphabetic characters and space!",
+      }),
     inviteeTimezone: Joi.string().custom(isValidTimeZone).required(),
     startDateTime: Joi.date().timestamp("unix").required(),
     endDateTime: Joi.date().timestamp("unix").required(),

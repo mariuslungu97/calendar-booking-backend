@@ -394,12 +394,8 @@ type TErrorInfo = {
 };
 const handleGraphqlError = (error: any, info: TErrorInfo): never => {
   if (error instanceof ValidationError) {
-    const { message, details } = error;
-    const messages = details.reduce(
-      (prev, detail) => (prev += detail.message + " "),
-      message
-    );
-    throw new GraphQLError(messages);
+    const { message } = error;
+    throw new GraphQLError(message);
   } else if (error instanceof GraphQLError) throw error;
 
   const defaultErrorMessage =
