@@ -7,7 +7,7 @@ import {
 
 const authRouter = express.Router();
 
-authRouter.post("auth/2fa", twoFaLoginCallbackHandler);
-authRouter.get("/auth/email", emailVerificationCallbackHandler);
+authRouter.post("/auth/2fa", twoFaLoginCallbackHandler);
+authRouter.get("/auth/verify", emailVerificationCallbackHandler);
 
 export default authRouter;

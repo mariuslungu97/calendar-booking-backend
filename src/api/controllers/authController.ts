@@ -1,11 +1,10 @@
 import { Request, Response } from "express";
-import jwt from "jsonwebtoken";
 
 import logger from "../../loaders/logger";
 import knex from "../../loaders/knex";
 
 import { decodeJwtString } from "../../utils";
-import { TUserSessionData } from "../../types";
+import { JwtError, TUserSessionData } from "../../types";
 
 interface EmailVerificationPayload {
   username: string;
@@ -20,23 +19,24 @@ interface AuthCallbackParams {
 }
 
 const emailVerificationCallbackHandler = async (
-  req: Request<AuthCallbackParams>,
+  req: Request<any, any, any, AuthCallbackParams>,
   res: Response
 ) => {
   try {
-    const { token } = req.params;
+    const { token } = req.query;
     if (!token)
       return res.status(400).json({
         message: "The request does not include the expected query params!",
       });
 
-    const decodedPayload = (await decodeJwtString(token)) as jwt.JwtPayload &
-      EmailVerificationPayload;
+    const decodedPayload = (await decodeJwtString(
+      token
+    )) as EmailVerificationPayload;
 
     const { username } = decodedPayload;
 
     const userList = await knex("users")
-      .select("id")
+      .select("id", "is_email_verified")
       .where("username", username);
     if (!userList.length) {
       res
@@ -47,15 +47,22 @@ const emailVerificationCallbackHandler = async (
       );
     }
 
+    const user = userList[0];
+    if (user.is_email_verified) {
+      return res
+        .status(400)
+        .json({ message: "The account's email is already verified!" });
+    }
+
     await knex("users")
       .update({ is_email_verified: true })
-      .where("id", userList[0].id);
+      .where("id", user.id);
 
     return res
       .status(200)
       .json({ message: "Your account's email has been verified!" });
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
+    if (err instanceof JwtError) {
       return res
         .status(401)
         .json({ message: "You are not authorised to perform this action!" });
@@ -66,18 +73,19 @@ const emailVerificationCallbackHandler = async (
 };
 
 const twoFaLoginCallbackHandler = async (
-  req: Request<AuthCallbackParams>,
+  req: Request<any, any, any, AuthCallbackParams>,
   res: Response
 ) => {
   try {
-    const { token } = req.params;
+    const { token } = req.query;
     if (!token)
       return res.status(400).json({
         message: "The request does not include the expected query params!",
       });
 
-    const decodedPayload = (await decodeJwtString(token)) as jwt.JwtPayload &
-      TwoFactorAuthPayload;
+    const decodedPayload = (await decodeJwtString(
+      token
+    )) as TwoFactorAuthPayload;
 
     const { username } = decodedPayload;
 
@@ -99,7 +107,7 @@ const twoFaLoginCallbackHandler = async (
 
     return res.status(200).json({ message: "You are now logged in!" });
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
+    if (err instanceof JwtError) {
       return res
         .status(401)
         .json({ message: "You are not authorised to perform this action!" });

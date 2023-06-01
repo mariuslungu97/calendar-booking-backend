@@ -3,6 +3,8 @@ import config from "../config";
 
 const { jwtSecret } = config.app;
 
+import { JwtError } from "../types";
+
 const signPayloadJwt = (
   payload: object,
   expirationDate: number
@@ -14,8 +16,8 @@ const signPayloadJwt = (
       { expiresIn: expirationDate },
       (error, token) => {
         if (error || !token) {
-          if (!token) reject(new Error("Couldn't retrieve token!"));
-          else reject(error);
+          if (!token) reject(new JwtError("Couldn't retrieve token!"));
+          else if (error) reject(new JwtError(error.message));
         } else resolve(token);
       }
     );
@@ -26,10 +28,10 @@ const decodeJwtString = (
   encodedJwt: string
 ): Promise<string | jwt.JwtPayload> => {
   return new Promise((resolve, reject) => {
-    jwt.verify(encodedJwt, jwtSecret, (err, decoded) => {
-      if (err || !decoded) {
-        if (!decoded) reject(new Error("Couldn't retrieve decoded!"));
-        else reject(err);
+    jwt.verify(encodedJwt, jwtSecret, (error, decoded) => {
+      if (error || !decoded) {
+        if (!decoded) reject(new JwtError("Couldn't retrieve decoded!"));
+        else if (error) reject(new JwtError(error.message));
       } else resolve(decoded);
     });
   });

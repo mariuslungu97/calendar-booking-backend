@@ -74,7 +74,7 @@ const generateMailFields = (
     const typedPayload = payload as TVerifyEmailPayload;
     const { username, userFirstName } = typedPayload;
 
-    linkUri += "/accounts/verify?token=";
+    linkUri += "/api/auth/verify?token=";
     subject = `${name} - Verify Your Email Address`;
     htmlFilePath += "verifyEmail.html";
     linkExpirationDate = 60 * 60 * 48; // 48 hours
@@ -90,7 +90,7 @@ const generateMailFields = (
     const {eventId, eventTypeName, eventDateTime, eventLocation, displayTimezone} = typedPayload; // prettier-ignore
     const { start, end } = eventDateTime;
 
-    linkUri += "/events/cancel?token=";
+    linkUri += "/api/events/cancel?token=";
     subject = `${name} - Event Confirmation Receipt`;
     htmlFilePath += "confirmEvent.html";
     linkExpirationDate = dayjs(start)
@@ -112,7 +112,7 @@ const generateMailFields = (
     const { start: startPastDateTime, end: endPastDateTime } = pastDateTime;
     const { start: startNewDateTime, end: endNewDateTime } = newDateTime;
 
-    linkUri += "/events/cancel?token=";
+    linkUri += "/api/events/cancel?token=";
     subject = `${name} - Event Update Notification Receipt`;
     htmlFilePath += "updateEvent.html";
     linkExpirationDate = dayjs(startNewDateTime)
@@ -141,7 +141,7 @@ const generateMailFields = (
     const typedPayload = payload as TTwoFactorAuthPayload;
     const { username, userFirstName } = typedPayload;
 
-    linkUri += "/login/2fa?token=";
+    linkUri += "/api/auth/2fa?token=";
     subject = `${name} - 2FA Authentication Link`;
     htmlFilePath += "twoFactor.html";
     linkExpirationDate = 60 * 10;

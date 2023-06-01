@@ -601,3 +601,9 @@ export interface ReducedSchedule {
   timezone: string;
   periods: ReducedPeriod[];
 }
+
+export class JwtError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}

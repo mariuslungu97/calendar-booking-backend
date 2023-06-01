@@ -173,7 +173,7 @@ const userMutations = {
         .orWhere("email", email);
       if (existingAccountList.length)
         throw new GraphQLError(
-          "An user with the same email and/or username already exists!"
+          "An user with the same email or username already exists!"
         );
 
       const saltRounds = 10;

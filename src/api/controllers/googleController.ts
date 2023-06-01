@@ -16,10 +16,10 @@ type TOAuthHandlerParams = {
 };
 
 const oAuthCallbackHandler = async (
-  req: Request<TOAuthHandlerParams>,
+  req: Request<any, any, any, TOAuthHandlerParams>,
   res: Response<IRestApiResponse<any, any>>
 ) => {
-  const { error: errorInfo, code, state } = req.params;
+  const { error: errorInfo, code, state } = req.query;
 
   if (errorInfo || !state) {
     if (!state)
