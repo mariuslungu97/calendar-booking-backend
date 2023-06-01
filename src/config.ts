@@ -17,6 +17,10 @@ const config = {
     host: process.env.APP_HOST || "localhost",
     name: process.env.APP_NAME || "My Booking App",
     uri: `${process.env.APP_PROTO}://${process.env.APP_HOST}:${process.env.APP_PORT}`,
+    sessionSecret: mandatoryEnv(
+      process.env.APP_SESSION_SECRET,
+      "APP_SESSION_SECRET"
+    ),
     jwtSecret: mandatoryEnv(process.env.APP_JWT_SECRET, "APP_JWT_SECRET"),
   },
   db: {

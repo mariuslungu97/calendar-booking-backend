@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import {
   loginValidationSchema,
   createAccountValidationSchema,
+  toggle2FaParamsValidationSchema,
 } from "./userValidation";
 import { isLoggedIn } from "../../../middleware/auth";
 import { handleGraphqlError } from "../../../../utils/api";
@@ -30,6 +31,10 @@ interface CreateAccountInputParams {
 interface LoginParams {
   email: string;
   password: string;
+}
+
+interface Toggle2FaParams {
+  activate: boolean;
 }
 
 interface CreateAccountResponse {
@@ -70,7 +75,7 @@ const userFields = {
             "event_schedules.id"
           )
           .where("user_id", id)
-          .andWhere("start_date_time", ">", Math.floor(Date.now() / 1000))
+          .andWhere("start_date_time", ">", new Date().toISOString())
           .orderBy("start_date_time", "asc")
           .limit(3)) as Event[];
 
@@ -262,24 +267,27 @@ const userMutations = {
       });
     }
   },
-  activate2Fa: async (_: any, __: any, ctx: GraphQlContext): Promise<User> => {
+  toggle2Fa: async (
+    _: any,
+    params: Toggle2FaParams,
+    ctx: GraphQlContext
+  ): Promise<User> => {
+    await toggle2FaParamsValidationSchema.validateAsync(params);
+
     const { req } = ctx;
     const { dbClient } = ctx.services;
 
     if (!isLoggedIn(req)) throw new GraphQLError("You are not authenticated!");
 
     const { id } = ctx.req.session.user as TUserSessionData;
+    const { activate } = params;
 
     try {
-      await dbClient("users")
-        .update({ is_2fa_activated: true })
+      const updatedUser = await dbClient("users")
+        .update({ is_2fa_activated: activate }, "*")
         .where("id", id);
 
-      const updatedUser = (
-        await dbClient("users").select("*").where("id", id)
-      )[0];
-
-      return updatedUser;
+      return updatedUser[0];
     } catch (err) {
       return handleGraphqlError(err, {
         server: "User.activate2Fa resolver error",

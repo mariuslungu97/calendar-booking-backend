@@ -2,6 +2,7 @@ import express from "express";
 
 import config from "./config";
 import yoga from "./loaders/graphql";
+import appSession from "./loaders/session";
 import authRouter from "./api/routes/authRoutes";
 import googleRouter from "./api/routes/googleRoutes";
 import stripeRouter from "./api/routes/stripeRoutes";
@@ -22,6 +23,7 @@ const startWorkers = async () => {
 const { port } = config.app;
 const app = express();
 
+app.use(appSession);
 app.use("/api", authRouter);
 app.use("/api", googleRouter);
 app.use("/api", stripeRouter);

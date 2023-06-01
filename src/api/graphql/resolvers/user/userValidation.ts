@@ -1,11 +1,21 @@
 import Joi from "joi";
 
+const passwordValidationChain = Joi.string()
+  .max(100)
+  .pattern(new RegExp(/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,}$/))
+  .required()
+  .messages({
+    "string.pattern.base":
+      "You must provide a password with minimum 8 characters, with at least one uppercase letter, one lowercase letter and one number!",
+  });
+
 const loginValidationSchema = Joi.object({
+  password: passwordValidationChain,
   email: Joi.string().email().required(),
-  password: Joi.string().max(200).required(),
 });
 
 const createAccountValidationSchema = Joi.object({
+  password: passwordValidationChain,
   username: Joi.string().alphanum().min(3).max(50).required(),
   email: Joi.string().email().required(),
   firstName: Joi.string()
@@ -24,14 +34,14 @@ const createAccountValidationSchema = Joi.object({
       "string.pattern.base":
         "Your first name can only contain alphabetic characters!",
     }),
-  password: Joi.string()
-    .max(100)
-    .pattern(new RegExp(/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,}$/))
-    .required()
-    .messages({
-      "string.pattern.base":
-        "You must provide a password with minimum 8 characters, with at least one uppercase letter, one lowercase letter and one number!",
-    }),
 });
 
-export { createAccountValidationSchema, loginValidationSchema };
+const toggle2FaParamsValidationSchema = Joi.object({
+  activate: Joi.boolean().required(),
+});
+
+export {
+  createAccountValidationSchema,
+  loginValidationSchema,
+  toggle2FaParamsValidationSchema,
+};

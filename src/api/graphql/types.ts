@@ -298,7 +298,7 @@ const graphQlTypeDefs = `
   type Mutation {
     createAccount(params: UserCreateInput!): CreateAccountResponse!
     login(email: String!, password: String!): LoginResponse!
-    activate2Fa: User!
+    toggle2Fa(activate: Boolean!): User!
     connectGoogleCalendar: ConnectResponse!
     connectStripe: ConnectResponse!
     createEventType(params: EventTypeCreateInput!): UserEventType!
