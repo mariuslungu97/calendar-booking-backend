@@ -348,6 +348,7 @@ export interface ICalendarSyncApi {
     jobData: any,
     jobOptions?: JobsOptions
   ) => Promise<void>;
+  isUserInSync: (userId: string) => Promise<boolean>;
 }
 
 export type TSyncJob = {

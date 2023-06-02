@@ -117,7 +117,30 @@ const addOneTimeSyncJob = async (
     });
 };
 
+const isUserInSync = async (userId: string) => {
+  const fullSyncRepeatableJobs = await fullSyncQueue.getRepeatableJobs();
+  const hasFullSyncJob = !!fullSyncRepeatableJobs.find(
+    (rJob) => rJob.id === userId
+  );
+
+  let hasPeriodicSyncJob: boolean = false;
+  if (config.app.proto === "https") {
+    hasPeriodicSyncJob = !!(await notificationChannelsRefreshQueue.getJob(
+      userId
+    ));
+  } else if (config.app.proto === "http") {
+    const partialSyncRepeatableJobs =
+      await incrementalSyncQueue.getRepeatableJobs();
+    hasPeriodicSyncJob = !!partialSyncRepeatableJobs.find(
+      (rJob) => rJob.id === userId
+    );
+  }
+
+  return hasFullSyncJob && hasPeriodicSyncJob;
+};
+
 const syncApi: ICalendarSyncApi = {
+  isUserInSync,
   startSyncRoutine,
   stopSyncRoutine,
   addOneTimeSyncJob,
