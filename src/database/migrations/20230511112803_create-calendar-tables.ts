@@ -250,7 +250,10 @@ export async function up(knex: Knex): Promise<void> {
           return knex.schema.hasTable("event_schedules").then((exists) => {
             if (!exists) {
               return knex.schema.createTable("event_schedules", (table) => {
-                table.uuid("id").primary();
+                table
+                  .uuid("id")
+                  .primary()
+                  .defaultTo(knex.raw("uuid_generate_v4()"));
                 table.timestamp("start_date_time").notNullable();
                 table.timestamp("end_date_time").notNullable();
                 table.integer("duration").unsigned().notNullable();
