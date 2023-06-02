@@ -9,7 +9,10 @@ const mandatoryEnv = (
   return env;
 };
 
+const webClientUri = mandatoryEnv(process.env.WEB_CLIENT_URI, "WEB_CLIENT_URI");
+
 const config = {
+  web: { clientUri: webClientUri },
   app: {
     isDev: mandatoryEnv(process.env.NODE_ENV, "NODE_ENV") === "development",
     port: +mandatoryEnv(process.env.APP_PORT, "APP_PORT"),
@@ -22,6 +25,9 @@ const config = {
       "APP_SESSION_SECRET"
     ),
     jwtSecret: mandatoryEnv(process.env.APP_JWT_SECRET, "APP_JWT_SECRET"),
+    authTwoFactorUri: process.env.APP_TWO_FACTOR_URI || "/api/auth/2fa",
+    authEmailVerifyUri: process.env.APP_EMAIL_VERIFY_URI || "/api/auth/verify",
+    cancelEventsUri: process.env.APP_CANCEL_EVENTS_URI || "/api/events/cancel",
   },
   db: {
     host: mandatoryEnv(process.env.APP_DB_HOST, "APP_DB_HOST"),
@@ -40,9 +46,10 @@ const config = {
     clientId: process.env.APP_GOOGLE_CLIENT_ID,
     clientSecret: process.env.APP_GOOGLE_CLIENT_SECRET,
     redirectUri:
-      process.env.APP_GOOGLE_REDIRECT_URI || "/google/oauth/callback",
+      process.env.APP_GOOGLE_REDIRECT_URI || "/api/google/oauth/callback",
     calendarWebhookUri:
-      process.env.APP_GOOGLE_CALENDAR_WEBHOOK_URI || "/google/calendar/events",
+      process.env.APP_GOOGLE_CALENDAR_WEBHOOK_URI ||
+      "/api/google/calendar/events",
   },
   smtp: {
     host: process.env.APP_SMTP_HOST,
@@ -56,23 +63,19 @@ const config = {
       process.env.STRIPE_WEBHOOK_ENDPOINTS_SECRET,
       "STRIPE_WEBHOOK_ENDPOINTS_SECRET"
     ),
-    accountLinkRefreshUri:
-      process.env.STRIPE_ACCOUNT_LINKS_REFRESH_URI ||
-      "/stripe/accounts/refresh",
-    accountLinkReturnUri:
-      process.env.STRIPE_ACCOUNT_LINKS_RETURN_URI || "/stripe/accounts/return",
-    paymentSuccessUri:
-      process.env.STRIPE_PAYMENT_SUCCESS_URI || "/stripe/payments/success",
-    paymentCancelUri:
-      process.env.STRIPE_PAYMENT_CANCEL_URI || "/stripe/payments/cancel",
+    accountLinkRefreshUri: webClientUri + "/stripe/connect/refresh",
+    accountLinkReturnUri: webClientUri + "/stripe/connect/return",
+    paymentSuccessUri: webClientUri,
+    paymentCancelUri: webClientUri,
     accountUpdateEventUri:
-      process.env.STRIPE_ACCOUNT_UPDATE_EVENT_URI || "/stripe/events/account",
+      process.env.STRIPE_ACCOUNT_UPDATE_EVENT_URI ||
+      "/api/stripe/events/account",
     sessionSuccessEventUri:
       process.env.STRIPE_SESSION_SUCCESS_EVENT_URI ||
-      "/stripe/events/session/success",
+      "/api/stripe/events/session/success",
     sessionFailureEventUri:
       process.env.STRIPE_SESSION_FAILURE_EVENT_URI ||
-      "/stripe/events/session/failure",
+      "/api/stripe/events/session/failure",
   },
   graphql: {
     path: process.env.APP_GRAPHQL_PATH || "/graphql",

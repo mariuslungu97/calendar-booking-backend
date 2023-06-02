@@ -69,25 +69,25 @@ const getClient = (userId: string) => {
 const isClientInStore = (userId: string) => userId in appAuthClients;
 
 const hydrateStore = async () => {
+  logger.info("Hydrating store using users' google connections!");
   try {
     const connections = await knexClient()
-      .select()
+      .select("*")
       .from("oauth_connections")
       .where({ provider: "GOOGLE" });
+
     for (const connection of connections) {
       const authClient = oAuthApi.getOAuthClient();
       authClient.setCredentials({
         access_token: connection.access_token,
         refresh_token: connection.refresh_token,
       });
-      authClient.on("tokens", (newTokens) =>
-        handleAccessTokenRefresh(connection.user_id, newTokens)
-      );
-      appAuthClients[connection.user_id] = authClient;
+      addClient(connection.user_id, authClient, false);
     }
   } catch (err) {
     logger.info("Failed to hydrate auth clients store!");
     logger.info(err);
+    throw err;
   }
 };
 

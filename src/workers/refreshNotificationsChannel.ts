@@ -12,6 +12,9 @@ import { TSyncJob } from "../types";
 
 const processor = async (job: Job<TSyncJob>) => {
   const { userId } = job.data;
+  logger.info(
+    `Processing channel notification refresh job for user with id ${userId}`
+  );
 
   try {
     // get auth client

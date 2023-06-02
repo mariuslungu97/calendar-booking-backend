@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+
 import config from "../config";
 
 const { jwtSecret } = config.app;
@@ -77,9 +78,9 @@ const areArraysEqual = (arr1: number[], arr2: number[]) => {
 };
 
 export {
+  randomString,
+  areArraysEqual,
   signPayloadJwt,
   decodeJwtString,
-  randomString,
   isValidTimeZone,
-  areArraysEqual,
 };

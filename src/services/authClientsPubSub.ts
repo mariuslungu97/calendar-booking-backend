@@ -10,9 +10,6 @@ import {
   TAuthClientsPubSubMessage,
 } from "../types";
 
-// TODO think of how you can avoid echoed calls to .publish
-// in the .addClient and .deleteClient methods
-
 const authClientsChannelName = "authClientsChannel";
 
 const authClientsPublisher = redisConnection();
@@ -22,7 +19,7 @@ authClientsSubscriber.subscribe(authClientsChannelName, (err) => {
   if (err) {
     logger.error("Failed to subscribe: %s", err.message);
   } else {
-    logger.info(`Subscribed successfully!`);
+    logger.info(`PubSub - Subscribed successfully!`);
   }
 });
 

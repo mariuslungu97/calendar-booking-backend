@@ -323,7 +323,7 @@ const userMutations = {
       );
 
       let authUrl = oAuthApi.generateOAuthUrl();
-      authUrl += `state=${encodedState}`;
+      authUrl += `&state=${encodedState}`;
 
       return {
         message: "Follow the redirect link to connect to your Google Calendar!",

@@ -22,6 +22,9 @@ export class IncrementalSyncError extends Error {
 
 const processor = async (job: Job<TSyncJob>): Promise<any> => {
   const { userId } = job.data;
+  logger.info(
+    `Processing incremental sync calendar job for user with id ${userId}`
+  );
 
   try {
     const googleConnection = (

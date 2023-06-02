@@ -18,10 +18,11 @@ import incrementalSyncCalendarWorker from "./workers/incrementalSync";
 import refreshNotificationChannelsWorker from "./workers/refreshNotificationsChannel";
 
 const startWorkers = async () => {
-  await mailTransportWorker.run();
-  await fullSyncCalendarWorker.run();
-  await incrementalSyncCalendarWorker.run();
-  await refreshNotificationChannelsWorker.run();
+  logger.info("Starting application workers!");
+  mailTransportWorker.run();
+  fullSyncCalendarWorker.run();
+  incrementalSyncCalendarWorker.run();
+  refreshNotificationChannelsWorker.run();
 };
 
 const batchStartCalendarSync = async () => {
@@ -58,15 +59,15 @@ const app = express();
 const { port, isDev } = config.app;
 if (isDev) app.use("/admin/queues", bullBoardServerAdapter.getRouter());
 app.use(appSession);
-app.use("/api", authRouter);
-app.use("/api", googleRouter);
-app.use("/api", stripeRouter);
+app.use(authRouter);
+app.use(googleRouter);
+app.use(stripeRouter);
 app.use(yoga.graphqlEndpoint, yoga);
 
 app.listen(port, async () => {
-  console.log(`Listening on port ${port}!`);
+  logger.info(`Listening on port ${port}!`);
 
+  startWorkers();
   await googleAuthStore.hydrateStore();
-  await startWorkers();
   await batchStartCalendarSync();
 });

@@ -38,8 +38,11 @@ const startSyncRoutine = async (userId: string) => {
     return;
   }
 
+  // one full sync asap
+  await fullSyncQueue.add("full", { userId }, { jobId: userId });
+
   const fullSyncEvery = 1000 * 60 * 60 * 24;
-  // full sync every 24 hours
+  // repeatable full sync every 24 hours
   await fullSyncQueue.add(
     "full",
     { userId },
@@ -68,7 +71,7 @@ const startSyncRoutine = async (userId: string) => {
         }
       );
   } else if (config.app.proto === "http") {
-    const incrementalSyncEvery = 1000 * 60 * 10; // 10 minutes
+    const incrementalSyncEvery = 1000 * 60 * 5; // 5 minutes
 
     // repeatable incremental sync
     await incrementalSyncQueue.add(

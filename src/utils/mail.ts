@@ -27,7 +27,8 @@ type TGenMailFieldsResponse = {
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-const { name, uri } = config.app;
+const { name, uri, authTwoFactorUri, authEmailVerifyUri, cancelEventsUri } =
+  config.app;
 
 const readHTMLFile = async (filePath: string): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -74,7 +75,7 @@ const generateMailFields = (
     const typedPayload = payload as TVerifyEmailPayload;
     const { username, userFirstName } = typedPayload;
 
-    linkUri += "/api/auth/verify?token=";
+    linkUri += authEmailVerifyUri + "?token=";
     subject = `${name} - Verify Your Email Address`;
     htmlFilePath += "verifyEmail.html";
     linkExpirationDate = 60 * 60 * 48; // 48 hours
@@ -90,7 +91,7 @@ const generateMailFields = (
     const {eventId, eventTypeName, eventDateTime, eventLocation, displayTimezone} = typedPayload; // prettier-ignore
     const { start, end } = eventDateTime;
 
-    linkUri += "/api/events/cancel?token=";
+    linkUri += cancelEventsUri + "?token=";
     subject = `${name} - Event Confirmation Receipt`;
     htmlFilePath += "confirmEvent.html";
     linkExpirationDate = dayjs(start)
@@ -112,7 +113,7 @@ const generateMailFields = (
     const { start: startPastDateTime, end: endPastDateTime } = pastDateTime;
     const { start: startNewDateTime, end: endNewDateTime } = newDateTime;
 
-    linkUri += "/api/events/cancel?token=";
+    linkUri += cancelEventsUri + "?token=";
     subject = `${name} - Event Update Notification Receipt`;
     htmlFilePath += "updateEvent.html";
     linkExpirationDate = dayjs(startNewDateTime)
@@ -141,7 +142,7 @@ const generateMailFields = (
     const typedPayload = payload as TTwoFactorAuthPayload;
     const { username, userFirstName } = typedPayload;
 
-    linkUri += "/api/auth/2fa?token=";
+    linkUri += authTwoFactorUri + "?token=";
     subject = `${name} - 2FA Authentication Link`;
     htmlFilePath += "twoFactor.html";
     linkExpirationDate = 60 * 10;

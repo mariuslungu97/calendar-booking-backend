@@ -12,6 +12,7 @@ import { TSyncJob } from "../types";
 
 const processor = async (job: Job<TSyncJob>): Promise<any> => {
   const { userId } = job.data;
+  logger.info(`Processing full sync calendar job for user with id ${userId}`);
 
   try {
     // get auth client
@@ -28,7 +29,6 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
       timeMin: dateNow.toISOString(),
       timeMax: dateNextSixMonths.toISOString(),
     });
-
     // sync events
     await syncCalendarEvents(data, userId);
 

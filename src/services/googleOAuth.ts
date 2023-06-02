@@ -6,12 +6,13 @@ import config from "../config";
 
 import { IGoogleOAuthApi } from "../types";
 
+const { uri } = config.app;
 const { clientId, clientSecret, redirectUri } = config.google;
 
 const appOAuthClient = new google.auth.OAuth2(
   clientId,
   clientSecret,
-  redirectUri
+  `${uri}${redirectUri}`
 );
 
 const scopes = ["https://www.googleapis.com/auth/calendar.events"];
