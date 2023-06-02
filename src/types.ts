@@ -312,13 +312,12 @@ export type TGetEventsResponse = {
   isSyncTokenInvalid: boolean;
 };
 
-export type TWatchCalendarParams = {
+export type TWatchPrimaryCalendarParams = {
   channelId: string;
-  address: string;
   expiration: string;
 };
 
-export type TStopWatchCalendarParams = {
+export type TStopWatchPrimaryCalendarParams = {
   channelId: string;
 };
 
@@ -329,8 +328,12 @@ export interface IGoogleCalendarApi {
     input: TCreateEventInput
   ) => Promise<calendar_v3.Schema$Event | null>;
   deleteEvent: (id: string) => Promise<boolean>;
-  watchCalendar: (params: TWatchCalendarParams) => Promise<boolean>;
-  stopWatchCalendar: (params: TStopWatchCalendarParams) => Promise<boolean>;
+  watchPrimaryCalendar: (
+    params: TWatchPrimaryCalendarParams
+  ) => Promise<boolean>;
+  stopWatchPrimaryCalendar: (
+    params: TStopWatchPrimaryCalendarParams
+  ) => Promise<boolean>;
 }
 
 /**

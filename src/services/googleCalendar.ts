@@ -10,8 +10,8 @@ import {
   TGetEventsParams,
   TGetEventsResponse,
   IGoogleCalendarApi,
-  TWatchCalendarParams,
-  TStopWatchCalendarParams,
+  TWatchPrimaryCalendarParams,
+  TStopWatchPrimaryCalendarParams,
 } from "../types";
 
 const calendar = google.calendar("v3");
@@ -137,18 +137,18 @@ const calendarApi = (
     }
   };
 
-  const watchCalendar = async (
-    params: TWatchCalendarParams
+  const watchPrimaryCalendar = async (
+    params: TWatchPrimaryCalendarParams
   ): Promise<boolean> => {
-    const { channelId, address, expiration } = params;
+    const { channelId, expiration } = params;
     try {
       const response = await calendar.events.watch({
         calendarId,
         requestBody: {
+          expiration,
           id: channelId,
           type: "web_hook",
-          address,
-          expiration,
+          address: `${config.app.uri}${config.google.calendarWebhookUri}`,
         },
       });
       if (response.data && response.data.id) return true;
@@ -159,8 +159,8 @@ const calendarApi = (
     }
   };
 
-  const stopWatchCalendar = async (
-    params: TStopWatchCalendarParams
+  const stopWatchPrimaryCalendar = async (
+    params: TStopWatchPrimaryCalendarParams
   ): Promise<boolean> => {
     const { channelId } = params;
     try {
@@ -188,8 +188,8 @@ const calendarApi = (
     deleteEvent,
     getEvent,
     getEvents,
-    watchCalendar,
-    stopWatchCalendar,
+    watchPrimaryCalendar,
+    stopWatchPrimaryCalendar,
   };
 };
 
