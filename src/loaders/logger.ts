@@ -1,4 +1,5 @@
 import { createLogger, transports, format } from "winston";
+import DailyRotateFile from "winston-daily-rotate-file";
 import fs from "fs";
 import path from "path";
 
@@ -15,29 +16,30 @@ if (!fs.existsSync(dir)) {
 
 const logLevel = config.app.isDev ? "debug" : "warn";
 
-// NOTE using this transport breaks the logging to the console
-// const dailyRotateFileTransport = new DailyRotateFile({
-//   level: logLevel,
-//   filename: dir + "/%DATE%.log",
-//   datePattern: "YYYY-MM-DD",
-//   zippedArchive: true,
-//   handleExceptions: true,
-//   maxSize: "20m",
-//   maxFiles: "14d",
-//   format: format.combine(
-//     format.errors({ stack: true }),
-//     format.timestamp(),
-//     format.json()
-//   ),
-// });
-
 const consoleTransport = new transports.Console({
   level: logLevel,
-  format: format.combine(format.errors({ stack: true }), format.prettyPrint()),
+  format: format.combine(format.colorize({ all: true }), format.padLevels()),
+});
+
+const dailyRotateFileTransport = new DailyRotateFile({
+  level: logLevel,
+  filename: dir + "/%DATE%.log",
+  datePattern: "YYYY-MM-DD",
+  zippedArchive: true,
+  handleExceptions: true,
+  maxSize: "20m",
+  maxFiles: "14d",
 });
 
 const logger = createLogger({
-  transports: [consoleTransport],
+  format: format.combine(
+    format.timestamp(),
+    format.ms(),
+    format.errors({ stack: true }),
+    format.splat(),
+    format.json()
+  ),
+  transports: [consoleTransport, dailyRotateFileTransport],
   exitOnError: false, // do not exit on handled exceptions
 });
 
