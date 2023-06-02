@@ -123,4 +123,9 @@ const syncApi: ICalendarSyncApi = {
   addOneTimeSyncJob,
 };
 
+export {
+  fullSyncQueue,
+  incrementalSyncQueue,
+  notificationChannelsRefreshQueue,
+};
 export default syncApi;
