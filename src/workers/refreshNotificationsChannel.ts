@@ -1,10 +1,10 @@
 import { Job, Worker } from "bullmq";
+import dayjs from "dayjs";
 
 import syncApi from "../services/calendarSync";
 import calendarApi from "../services/googleCalendar";
 import googleAuthStore from "../services/googleAuthClients";
 
-import config from "../config";
 import logger from "../loaders/logger";
 import redisConnection from "../loaders/redis";
 
@@ -20,18 +20,19 @@ const processor = async (job: Job<TSyncJob>) => {
     // get auth client
     const authClient = googleAuthStore.getClient(userId);
     if (!authClient) throw new Error("Couldn't find the auth client in store!");
-    const { watchCalendar, stopWatchCalendar } = calendarApi(authClient);
+    const { watchPrimaryCalendar, stopWatchPrimaryCalendar } =
+      calendarApi(authClient);
 
-    await stopWatchCalendar({
+    const stoppedWatching = await stopWatchPrimaryCalendar({
       channelId: userId,
     });
+    if (!stoppedWatching)
+      throw new Error("Couldn't stop watching primary calendar!");
 
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 30);
-    await watchCalendar({
+    const expiration = dayjs().add(30, "day");
+    await watchPrimaryCalendar({
       channelId: userId,
-      address: `${config.app.uri}${config.google.calendarWebhookUri}`,
-      expiration: targetDate.toISOString(),
+      expiration: expiration.toISOString(),
     });
 
     // make sure you resubscribe to the same channel 1 hour before it expires
@@ -40,11 +41,13 @@ const processor = async (job: Job<TSyncJob>) => {
       userId,
       { userId },
       {
-        delay: Number(targetDate) - Number(Date.now()) - 60 * 60,
+        delay: expiration.subtract(1, "hour").diff(dayjs(), "millisecond"),
       }
     );
   } catch (err) {
-    logger.info("Encountered an unexpected error whilst processing a job!");
+    logger.info(
+      "Encountered an unexpected error whilst processing a primary calendar notification channel job!"
+    );
     throw err;
   }
 };

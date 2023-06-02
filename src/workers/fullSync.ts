@@ -39,7 +39,9 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
 
     return;
   } catch (err) {
-    logger.info("Encountered an unexpected error whilst processing a job!");
+    logger.info(
+      "Encountered an unexpected error whilst processing a Google Calendar full sync job!"
+    );
     throw err;
   }
 };

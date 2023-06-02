@@ -11,7 +11,10 @@ import { syncCalendarEvents } from "../utils/sync";
 
 import { TSyncJob } from "../types";
 
-type TSyncErrorReason = "SYNC_TOKEN_NOT_FOUND" | "INVALID_SYNC_TOKEN";
+type TSyncErrorReason =
+  | "USER_NOT_FOUND"
+  | "SYNC_TOKEN_NOT_FOUND"
+  | "INVALID_SYNC_TOKEN";
 export class IncrementalSyncError extends Error {
   public reason: TSyncErrorReason;
   constructor(message: string, reason: TSyncErrorReason) {
@@ -27,16 +30,20 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
   );
 
   try {
-    const googleConnection = (
-      await knexClient
-        .select("calendar_sync_token")
-        .from("users")
-        .where({ id: userId })
-    )[0];
+    const userList = await knexClient("users")
+      .select("calendar_sync_token")
+      .where({ id: userId });
 
-    if (!googleConnection.calendar_sync_token)
+    if (!userList.length)
       throw new IncrementalSyncError(
-        "Couldn't find a sync token for user with provided id!",
+        "Couldn't find a user with provided id!",
+        "USER_NOT_FOUND"
+      );
+    const user = userList[0];
+
+    if (!user.calendar_sync_token)
+      throw new IncrementalSyncError(
+        "Couldn't find a calendar sync token for user with provided id!",
         "SYNC_TOKEN_NOT_FOUND"
       );
 
@@ -46,7 +53,7 @@ const processor = async (job: Job<TSyncJob>): Promise<any> => {
 
     const { getEvents } = calendarApi(authClient);
     const { data, syncToken, isSyncTokenInvalid } = await getEvents({
-      syncToken: googleConnection.calendar_sync_token,
+      syncToken: user.calendar_sync_token,
     });
 
     if (isSyncTokenInvalid)
@@ -85,10 +92,12 @@ incrementalSyncWorker.on("failed", async (job, error) => {
     const { reason } = error;
 
     logger.info(
-      `Encountered calendar sync error of type ${reason} whilst performing process!`
+      `Encountered calendar sync error of type ${reason} whilst performing an incremental sync process!`
     );
 
-    if (reason === "SYNC_TOKEN_NOT_FOUND") {
+    if (reason === "USER_NOT_FOUND") {
+      syncApi.stopSyncRoutine(userId);
+    } else if (reason === "SYNC_TOKEN_NOT_FOUND") {
       syncApi.addOneTimeSyncJob("fullSync", userId, { userId });
     } else if (reason === "INVALID_SYNC_TOKEN") {
       syncApi.addOneTimeSyncJob("fullSync", userId, { userId });
