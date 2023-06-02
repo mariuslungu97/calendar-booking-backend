@@ -1,4 +1,5 @@
 import { Queue, JobsOptions } from "bullmq";
+import dayjs from "dayjs";
 
 import calendarApi from "./googleCalendar";
 import googleAuthStore from "./googleAuthClients";
@@ -16,6 +17,13 @@ const stopQueueRepeatableJob = async (queue: Queue, jobId: string) => {
   await queue.removeRepeatableByKey(repeatableJob.key);
 };
 
+const hasRepeatableJob = async (queue: Queue, jobId: string) => {
+  const repeatableJobs = await queue.getRepeatableJobs();
+  const repeatableJob = repeatableJobs.find((rJob) => rJob.id === jobId);
+  if (repeatableJob) return true;
+  return false;
+};
+
 const fullSyncQueue = new Queue<TSyncJob>(
   "calendarFullSync", // eslint-disable-line
   { connection: redisConnection() }
@@ -30,55 +38,57 @@ const notificationChannelsRefreshQueue = new Queue<TSyncJob>(
 );
 
 const startSyncRoutine = async (userId: string) => {
-  logger.info("Start sync routine for user!");
+  try {
+    logger.info(
+      `Starting Google Calendar sync routine for user with ID ${userId}`
+    );
 
-  const authClient = googleAuthStore.getClient(userId);
-  if (!authClient) {
-    logger.info("Couldn't find auth client for user!");
-    return;
-  }
+    const authClient = googleAuthStore.getClient(userId);
+    if (!authClient) {
+      throw new Error("Cannot find auth client!");
+    }
 
-  // one full sync asap
-  await fullSyncQueue.add("full", { userId }, { jobId: userId });
+    const FULL_SYNC_EVERY = 1000 * 60 * 60 * 24; // 24 hours
+    await fullSyncQueue.add(
+      "full",
+      { userId },
+      { jobId: userId, repeat: { every: FULL_SYNC_EVERY, immediately: true } }
+    );
 
-  const fullSyncEvery = 1000 * 60 * 60 * 24;
-  // repeatable full sync every 24 hours
-  await fullSyncQueue.add(
-    "full",
-    { userId },
-    { jobId: userId, repeat: { every: fullSyncEvery } }
-  );
-
-  if (config.app.proto === "https") {
-    // subscribe to calendar events notifications on behalf of the user
-    const { watchCalendar } = calendarApi(authClient);
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 30);
-    const subscribed = await watchCalendar({
-      channelId: userId,
-      expiration: targetDate.toISOString(),
-      address: `${config.app.uri}${config.google.calendarWebhookUri}`,
-    });
-
-    // refresh channel event subscription one hour before expiration
-    if (subscribed)
+    if (config.app.proto === "https") {
+      const { watchPrimaryCalendar } = calendarApi(authClient);
+      const expirationDate = dayjs().add(30, "day");
+      const isWatching = watchPrimaryCalendar({
+        channelId: userId,
+        expiration: expirationDate.toISOString(),
+        address: `${config.app.uri}${config.google.calendarWebhookUri}`,
+      });
+      if (!isWatching)
+        throw new Error("Did not manage to start watching primary calendar!");
       await notificationChannelsRefreshQueue.add(
         "refresh",
         { userId },
         {
           jobId: userId,
-          delay: Number(targetDate) - Number(Date.now()) - 60 * 60,
+          delay: expirationDate
+            .subtract(1, "hour")
+            .diff(dayjs(), "millisecond"),
         }
       );
-  } else if (config.app.proto === "http") {
-    const incrementalSyncEvery = 1000 * 60 * 5; // 5 minutes
-
-    // repeatable incremental sync
-    await incrementalSyncQueue.add(
-      "incremental",
-      { userId },
-      { jobId: userId, repeat: { every: incrementalSyncEvery } }
+    } else if (config.app.proto === "http") {
+      const INCREMENTAL_SYNC_EVERY = 1000 * 60 * 5; // 5 minutes
+      await incrementalSyncQueue.add(
+        "incremental",
+        { userId },
+        { jobId: userId, repeat: { every: INCREMENTAL_SYNC_EVERY } }
+      );
+    }
+  } catch (err) {
+    logger.error(
+      "Unexpected error trying to start Google calendar syncing process!"
     );
+    logger.error(err);
+    await stopSyncRoutine(userId); // make sure we're not partially synced
   }
 };
 
@@ -94,9 +104,9 @@ const stopSyncRoutine = async (userId: string) => {
   await stopQueueRepeatableJob(fullSyncQueue, userId);
 
   if (config.app.proto === "https") {
-    const { stopWatchCalendar } = calendarApi(authClient);
+    const { stopWatchPrimaryCalendar } = calendarApi(authClient);
 
-    await stopWatchCalendar({ channelId: userId });
+    await stopWatchPrimaryCalendar({ channelId: userId });
     await notificationChannelsRefreshQueue.remove(userId);
   } else if (config.app.proto === "http") {
     await stopQueueRepeatableJob(incrementalSyncQueue, userId);
@@ -121,25 +131,23 @@ const addOneTimeSyncJob = async (
 };
 
 const isUserInSync = async (userId: string) => {
-  const fullSyncRepeatableJobs = await fullSyncQueue.getRepeatableJobs();
-  const hasFullSyncJob = !!fullSyncRepeatableJobs.find(
-    (rJob) => rJob.id === userId
-  );
+  const hasFullSyncJob = await hasRepeatableJob(fullSyncQueue, userId);
 
-  let hasPeriodicSyncJob: boolean = false;
+  let hasIncrementalSyncJob = false;
+  let hasChannelsRefreshJob = false;
+
   if (config.app.proto === "https") {
-    hasPeriodicSyncJob = !!(await notificationChannelsRefreshQueue.getJob(
+    hasChannelsRefreshJob = !!(await notificationChannelsRefreshQueue.getJob(
       userId
     ));
   } else if (config.app.proto === "http") {
-    const partialSyncRepeatableJobs =
-      await incrementalSyncQueue.getRepeatableJobs();
-    hasPeriodicSyncJob = !!partialSyncRepeatableJobs.find(
-      (rJob) => rJob.id === userId
+    hasIncrementalSyncJob = await hasRepeatableJob(
+      incrementalSyncQueue,
+      userId
     );
   }
 
-  return hasFullSyncJob && hasPeriodicSyncJob;
+  return hasFullSyncJob && (hasIncrementalSyncJob || hasChannelsRefreshJob);
 };
 
 const syncApi: ICalendarSyncApi = {
