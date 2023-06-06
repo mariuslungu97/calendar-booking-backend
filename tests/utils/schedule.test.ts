@@ -13,6 +13,11 @@ const getDate = (day: number, time: string) =>
     .hour(parseInt(time.split(":")[0]))
     .minute(parseInt(time.split(":")[1]));
 
+const getFullDate = (date: string, time: string) =>
+  dayjs(date, "DD-MM-YYYY")
+    .hour(parseInt(time.split(":")[0]))
+    .minute(parseInt(time.split(":")[1]));
+
 describe("Calendar Scheduling Algorithms", () => {
   test("retrieve available time slots given a schedule and some booked slots", () => {
     const schedule = [
@@ -53,6 +58,37 @@ describe("Calendar Scheduling Algorithms", () => {
       [getDate(0, "10:00"), getDate(0, "10:35")],
       [getDate(0, "11:10"), getDate(0, "11:30")],
       [getDate(0, "14:10"), getDate(0, "14:45")],
+    ] as TDayjsSlot[];
+
+    for (const validSlot of validSlots) {
+      const isValid = isTimeSlotAvailable(schedule, bookedSlots, validSlot);
+      expect(isValid).toBe(true);
+    }
+
+    for (const invalidSlot of invalidSlots) {
+      const isValid = isTimeSlotAvailable(schedule, bookedSlots, invalidSlot);
+      expect(isValid).toBe(false);
+    }
+  });
+
+  test("check if meetings are available for booking across days", () => {
+    const schedule = [
+      [getFullDate("01-05-2023", "21:00"), getFullDate("02-05-2023", "03:00")],
+    ] as TDayjsSlot[];
+
+    const bookedSlots = [
+      [getFullDate("01-05-2023", "21:00"), getFullDate("01-05-2023", "21:30")],
+      [getFullDate("01-05-2023", "23:30"), getFullDate("02-05-2023", "00:30")],
+    ] as TDayjsSlot[];
+
+    const validSlots = [
+      [getFullDate("01-05-2023", "21:45"), getFullDate("01-05-2023", "22:30")],
+      [getFullDate("02-05-2023", "01:00"), getFullDate("02-05-2023", "03:00")],
+    ] as TDayjsSlot[];
+
+    const invalidSlots = [
+      [getFullDate("01-05-2023", "21:25"), getFullDate("01-05-2023", "22:25")],
+      [getFullDate("01-05-2023", "23:00"), getFullDate("02-05-2023", "00:15")],
     ] as TDayjsSlot[];
 
     for (const validSlot of validSlots) {

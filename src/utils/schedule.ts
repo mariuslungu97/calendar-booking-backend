@@ -156,10 +156,23 @@ class TimePeriod {
 
   isSlotAvailable(slot: TimeSlot): boolean {
     for (const timeSlot of this._schedule) {
+      console.log(
+        `IS TIME SLOT ${slot.toString()} WITHIN ${timeSlot.toString()}? ${timeSlot.isWithinBounds(
+          slot
+        )}`
+      );
       if (timeSlot.isWithinBounds(slot)) return true;
     }
 
     return false;
+  }
+
+  toString() {
+    let str = "";
+    for (const period of this._schedule) {
+      str += `TIME PERIOD SLOT: ${period.toString()}\n`;
+    }
+    return str;
   }
 }
 
@@ -204,11 +217,13 @@ const isTimeSlotAvailable = (
   }
 
   const timePeriod = new TimePeriod(scheduleTimeSlots);
+  console.log(`INITIAL TIME PERIOD\n${timePeriod.toString()}`);
 
   for (const bookedDayjsSlot of booked) {
     const bookedSlot = new TimeSlot(bookedDayjsSlot[0], bookedDayjsSlot[1]);
     timePeriod.erase(bookedSlot);
   }
+  console.log(`ALTERED TIME PERIOD\n${timePeriod.toString()}`);
 
   return timePeriod.isSlotAvailable(new TimeSlot(slot[0], slot[1]));
 };
@@ -271,6 +286,14 @@ const dayTimeToDate = (day: number, time: string, tz: string): Dayjs => {
   return date;
 };
 
+const getFullDate = (date: string, time: string, tz = "Etc/UTC") => {
+  const dateLocal = dayjs
+    .tz(dayjs(date, "DD-MM-YYYY"), tz)
+    .hour(parseInt(time.split(":")[0]))
+    .minute(parseInt(time.split(":")[1]));
+  return dateLocal;
+};
+
 const dateInTimezone = (date: Dayjs, tz: string) => dayjs.tz(date, tz);
 const dateToTimezone = (date: Dayjs, tz: string) => date.tz(tz);
 
@@ -281,7 +304,8 @@ export {
   getMonthStartEnd,
   getDateStartEnd,
   convertDayTime,
-  dayTimeToDate,
   dateInTimezone,
   dateToTimezone,
+  dayTimeToDate,
+  getFullDate,
 };
