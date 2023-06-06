@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import { GraphQLError } from "graphql";
 import { calendar_v3 } from "googleapis";
 
+import { dateInTimezone, dateToTimezone } from "../../../../utils/schedule";
 import { isLoggedIn } from "../../../middleware/auth";
 import {
   isDateAvailable,
@@ -34,8 +35,8 @@ interface BookEventCreateInput {
   inviteeEmail: string;
   inviteeFullName: string;
   inviteeTimezone: string;
-  startDateTime: string;
-  endDateTime: string;
+  date: string;
+  startTime: string;
   answers: EventAnswer[];
 }
 
@@ -317,8 +318,8 @@ const eventMutations = {
         inviteeEmail,
         inviteeFullName,
         inviteeTimezone,
-        startDateTime,
-        endDateTime,
+        date,
+        startTime,
         answers,
       } = createParams;
 
@@ -357,8 +358,36 @@ const eventMutations = {
           );
       });
 
+      // check if date is within [today, next 6 months]
+      const dayDate = dateInTimezone(
+        dayjs(date, "DD-MM-YYYY"),
+        inviteeTimezone
+      );
+      const visitorCurrentDate = dateToTimezone(dayjs(), inviteeTimezone);
+
+      if (
+        dayDate.isBefore(visitorCurrentDate, "date") ||
+        dayDate.isAfter(visitorCurrentDate.add(6, "month"), "date")
+      ) {
+        throw new GraphQLError(
+          "You can only retrieve available dates within the next 6 months!"
+        );
+      }
+      // parse start datetime
+      const startTimeHours = parseInt(startTime.split(":")[0]);
+      const startTimeMinutes = parseInt(startTime.split(":")[1]);
+      const startDateTime = dateInTimezone(
+        dayjs(dayDate).hour(startTimeHours).minute(startTimeMinutes),
+        inviteeTimezone
+      );
+      const endDateTime = startDateTime.add(eventType.duration, "minute");
+
       // check if event with times is available for booking
-      if (!isDateAvailable(eventType, [startDateTime, endDateTime]))
+      const canBeBooked = await isDateAvailable(eventType, [
+        startDateTime.toISOString(),
+        endDateTime.toISOString(),
+      ]);
+      if (!canBeBooked)
         throw new GraphQLError(
           "You cannot book the event at these start and end times!"
         );
@@ -367,8 +396,8 @@ const eventMutations = {
       const eventSchedule = (
         await dbClient("event_schedules").insert(
           {
-            start_date_time: startDateTime,
-            end_date_time: endDateTime,
+            start_date_time: startDateTime.toISOString(),
+            end_date_time: endDateTime.toISOString(),
             duration: dayjs(endDateTime).diff(dayjs(startDateTime), "minute"),
           },
           "*"
@@ -405,7 +434,9 @@ const eventMutations = {
           }));
         })
         .flat();
-      await dbClient("event_answers").insert(eventAnswersFields);
+
+      if (eventAnswersFields.length !== 0)
+        await dbClient("event_answers").insert(eventAnswersFields);
 
       // create google calendar event if connected to Google
       let googleCalendarEvent: calendar_v3.Schema$Event | null = null;

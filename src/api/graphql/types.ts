@@ -238,8 +238,8 @@ const graphQlTypeDefs = `
     inviteeEmail: String!
     inviteeFullName: String!
     inviteeTimezone: String!
-    startDateTime: String!
-    endDateTime: String!
+    date: String!
+    startTime: String!
     answers: [EventAnswerInput!]!
   }
 

@@ -15,8 +15,30 @@ const bookEventParamsValidationSchema = Joi.object({
           "The name can only include alphabetic characters and space!",
       }),
     inviteeTimezone: Joi.string().custom(isValidTimeZone).required(),
-    startDateTime: Joi.date().timestamp("unix").required(),
-    endDateTime: Joi.date().timestamp("unix").required(),
+    date: Joi.string()
+      .pattern(
+        new RegExp(/^([0-2][0-9]|(3)[0-1])-(((0)[0-9])|((1)[0-2]))-\d{4}$/)
+      )
+      .required()
+      .messages({
+        "string.pattern.base":
+          "The date you provide has to adhere to the following pattern: 'DD-MM-YYYY'",
+      }),
+    startTime: Joi.string()
+      .pattern(new RegExp(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/))
+      .required()
+      .messages({
+        "string.pattern.base":
+          "Your start and end times must adhere to the following format: 'HH:mm' !",
+      }),
+    answers: Joi.array()
+      .items(
+        Joi.object({
+          questionId: Joi.string().guid().required(),
+          answer: Joi.array().items(Joi.string()).required(),
+        })
+      )
+      .required(),
   }),
 });
 
