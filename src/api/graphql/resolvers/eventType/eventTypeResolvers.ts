@@ -2,16 +2,21 @@ import { GraphQLError } from "graphql";
 import dayjs from "dayjs";
 
 import {
+  areSchedulePeriodsValid,
   retrieveAvailableDates,
   retrieveAvailableTimes,
   handleGraphqlError,
+  parsePaginationCursor,
 } from "../../../../utils/api";
 import { dateToTimezone } from "../../../../utils/schedule";
+import { isLoggedIn } from "../../../middleware/auth";
+import { cursorPaginationParamsValidationSchema } from "../validation";
 import {
   availableDatesParamsValidationSchema,
   availableTimesParamsValidationSchema,
   eventTypeCreateInputValidationSchema,
   eventTypeUpdateParamsValidationSchema,
+  eventTypeDeleteParamsValidationSchema,
   eventTypeUpdatePaymentParamsValidationSchema,
   eventTypeScheduleUpdateParamsValidationSchema,
   eventTypeUpdateQuestionsParamsValidationSchema,
@@ -22,13 +27,13 @@ import {
   PageInfo,
   AvailableDate,
   AvailableDates,
+  SchedulePeriodGraphQl,
   CursorPaginationParams,
   GraphQlContext,
   TUserSessionData,
   TEventTypeQuestionType,
   TEventTypeLocationType,
 } from "../../../../types";
-import { isLoggedIn } from "../../../middleware/auth";
 
 interface QuestionInput {
   type: TEventTypeQuestionType;
@@ -50,15 +55,9 @@ interface Location {
   value: string | null;
 }
 
-interface SchedulePeriod {
-  day: number;
-  startTime: string;
-  endTime: string;
-}
-
 interface Schedule {
   timezone: string;
-  periods: SchedulePeriod[];
+  periods: SchedulePeriodGraphQl[];
 }
 
 interface AvailableDatesParams {
@@ -82,15 +81,17 @@ interface ViewBookingInformationParams {
 }
 
 interface CreateEventTypeInputParams {
-  name: string;
-  link: string;
-  duration: number;
-  collectsPayments: boolean;
-  description?: string;
-  paymentFee?: number;
-  schedule: Schedule;
-  location: Location;
-  questions: QuestionInput[];
+  params: {
+    name: string;
+    link: string;
+    duration: number;
+    collectsPayments: boolean;
+    description?: string;
+    paymentFee?: number;
+    schedule: Schedule;
+    location: Location;
+    questions: QuestionInput[];
+  };
 }
 
 interface UpdateEventTypeParams {
@@ -265,6 +266,8 @@ const eventTypeFields = {
   UserEventType: {
     ...commonEventTypeFields,
     isActive: (parent: EventType) => parent.is_active,
+    createdAt: (parent: EventType) => parent.created_at,
+    updatedAt: (parent: EventType) => parent.updated_at,
     location: (parent: EventType): Location => ({
       type: parent.location,
       value: parent.location_value || null,
@@ -283,10 +286,10 @@ const eventTypeFields = {
         );
 
         const eventSchedule = eventScheduleList[0];
-        const eventSchedulePeriods = await dbClient("schedule_periods").where(
-          "schedule_id",
-          eventSchedule.id
-        );
+        const eventSchedulePeriods = await dbClient("schedule_periods")
+          .where("schedule_id", eventSchedule.id)
+          .orderBy("day", "asc")
+          .orderBy("start_time", "asc");
 
         const scheduleWithPeriods: Schedule = {
           timezone: eventSchedule.timezone,
@@ -296,7 +299,7 @@ const eventTypeFields = {
                 day: period.day,
                 startTime: period.start_time,
                 endTime: period.end_time,
-              } as SchedulePeriod)
+              } as SchedulePeriodGraphQl)
           ),
         };
 
@@ -317,27 +320,42 @@ const eventTypeQueries = {
     params: CursorPaginationParams,
     ctx: GraphQlContext
   ): Promise<EventTypeConnections> => {
-    const { req } = ctx;
-
-    if (!isLoggedIn(req)) throw new GraphQLError("You are not authenticated!");
-
     try {
+      const { req } = ctx;
+      if (!isLoggedIn(req))
+        throw new GraphQLError("You are not authenticated!");
+
+      await cursorPaginationParamsValidationSchema.validateAsync(params);
+
       const { dbClient } = ctx.services;
       const { id: userId } = req.session.user as TUserSessionData;
       const { cursor, order, take } = params;
 
-      const decodedCursor = Buffer.from(cursor, "base64").toString("ascii");
-      const isNext = decodedCursor.split("__")[0];
-      const timestamp = decodedCursor.split("__")[1];
-      const operator = isNext ? "<" : ">";
-      // reverse orders if we're going back
-      const updatedOrder = isNext ? order : order === "DESC" ? "ASC" : "DESC";
-      const eventTypes = await dbClient("event_types")
+      let isNext = true;
+      let timestamp = "";
+      let operator = "<"; // based on isNext == true && order == "DESC"
+
+      if (cursor !== "") {
+        const decodedCursorResponse = parsePaginationCursor(cursor);
+        isNext = decodedCursorResponse[0];
+        timestamp = decodedCursorResponse[1];
+      }
+
+      if (isNext && order === "ASC") operator = ">";
+      else if (!isNext && order === "ASC") operator = "<";
+      else if (isNext && order === "DESC") operator = "<";
+      else if (!isNext && order === "DESC") operator = ">";
+
+      const eventTypesQuery = dbClient("event_types")
         .select("*")
         .where("user_id", userId)
-        .andWhere("updated_at", operator, timestamp)
-        .orderBy("updated_at", updatedOrder)
+        .orderBy("updated_at", order)
         .limit(take);
+
+      if (timestamp !== "")
+        eventTypesQuery.andWhere("updated_at", operator, timestamp);
+
+      const eventTypes = await eventTypesQuery;
 
       if (!eventTypes.length)
         return {
@@ -348,29 +366,30 @@ const eventTypeQueries = {
       const firstEventType = eventTypes[0];
       const lastEventType = eventTypes[eventTypes.length - 1];
 
+      const prevOperator = order === "DESC" ? ">" : "<";
       const prevEventType = await dbClient("event_types")
         .select("updated_at")
         .where("user_id", userId)
-        .andWhere("updated_at", operator, firstEventType.updated_at)
-        .orderBy("updated_at", updatedOrder)
+        .andWhere("updated_at", prevOperator, firstEventType.updated_at)
+        .orderBy("updated_at", order)
         .limit(1);
       const nextEventType = await dbClient("event_types")
         .select("updated_at")
         .where("user_id", userId)
         .andWhere("updated_at", operator, lastEventType.updated_at)
-        .orderBy("updated_at", updatedOrder)
+        .orderBy("updated_at", order)
         .limit(1);
 
       const pageInfo: PageInfo = {
         nextPage: nextEventType.length
           ? Buffer.from(
-              `next__${nextEventType[0].updated_at}`,
+              `next__${dayjs(lastEventType.updated_at).unix()}`,
               "ascii"
             ).toString("base64")
           : null,
         previousPage: prevEventType.length
           ? Buffer.from(
-              `prev__${prevEventType[0].updated_at}`,
+              `prev__${dayjs(firstEventType.updated_at).unix()}`,
               "ascii"
             ).toString("base64")
           : null,
@@ -409,7 +428,8 @@ const eventTypeQueries = {
         .select("*")
         .where("user_id", user.id)
         .andWhere("link", eventTypeLink);
-      if (!eventTypeList.length)
+
+      if (!eventTypeList.length || !eventTypeList[0].is_active)
         throw new GraphQLError("The requested event type couldn't be found!");
 
       return eventTypeList[0];
@@ -430,25 +450,13 @@ const eventTypeMutations = {
     ctx: GraphQlContext
   ): Promise<EventType> => {
     try {
-      const { dbClient, stripeApi } = ctx.services;
       const { req } = ctx;
-
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
-
-      await eventTypeCreateInputValidationSchema.validateAsync(params);
-
       const { id: userId } = req.session.user as TUserSessionData;
 
-      // check if event type with link for user with id already exists
-      const existingEventType = await dbClient("event_types")
-        .where("user_id", userId)
-        .andWhere("link", params.link);
-      if (existingEventType.length)
-        throw new GraphQLError(
-          "You already have created an event type with the same link!"
-        );
-
+      const { params: createParams } = params;
+      await eventTypeCreateInputValidationSchema.validateAsync(createParams);
       const {
         collectsPayments,
         paymentFee,
@@ -459,7 +467,15 @@ const eventTypeMutations = {
         link,
         questions,
         description,
-      } = params;
+      } = createParams;
+
+      const arePeriodsValid = areSchedulePeriodsValid(schedule.periods);
+      if (!arePeriodsValid)
+        throw new GraphQLError(
+          "The schedule periods you provided are not valid!"
+        );
+
+      const { dbClient, stripeApi } = ctx.services;
 
       if (location.type === "G_MEET") {
         const { oAuthStoreApi } = ctx.services;
@@ -468,6 +484,15 @@ const eventTypeMutations = {
             "You cannot generate Google Meet links for your events without being connected to Google!"
           );
       }
+
+      // check if event type with link for user with id already exists
+      const existingEventType = await dbClient("event_types")
+        .where("user_id", userId)
+        .andWhere("link", link);
+      if (existingEventType.length)
+        throw new GraphQLError(
+          "You already have created an event type with the same link!"
+        );
 
       let stripeProductId: string | null = null;
       let stripePriceId: string | null = null;
@@ -534,11 +559,12 @@ const eventTypeMutations = {
             description,
             user_id: userId,
             location: location.type,
-            location_value: location.value,
             stripe_price_id: stripePriceId,
+            payment_fee: paymentFee || null,
             stripe_product_id: stripeProductId,
             schedule_id: createdSchedule.id,
             collects_payments: collectsPayments,
+            location_value: location.type === "G_MEET" ? null : location.value,
           },
           "*"
         )
@@ -572,9 +598,10 @@ const eventTypeMutations = {
         .filter((possibleAnswer) => possibleAnswer !== undefined)
         .flat() as { question_id: string; value: string }[];
 
-      await dbClient("event_type_question_possible_answers").insert(
-        possibleAnswersFields
-      );
+      if (possibleAnswersFields.length !== 0)
+        await dbClient("event_type_question_possible_answers").insert(
+          possibleAnswersFields
+        );
 
       // return event type
       return createdEventType;
@@ -594,14 +621,13 @@ const eventTypeMutations = {
       const { req } = ctx;
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
-
       const { id: userId } = req.session.user as TUserSessionData;
 
       await eventTypeUpdateParamsValidationSchema.validateAsync(params);
-
-      const { dbClient } = ctx.services;
       const { eventTypeId, params: updateParams } = params;
       const { name, description, duration, isActive, location } = updateParams;
+
+      const { dbClient } = ctx.services;
 
       const updatedEventType = await dbClient("event_types")
         .where("id", eventTypeId)
@@ -614,8 +640,10 @@ const eventTypeMutations = {
             is_active: isActive,
             ...(location && {
               location: location.type,
-              location_value: location.value,
+              location_value:
+                location.type === "G_MEET" ? null : location.value,
             }),
+            updated_at: dayjs().toISOString(),
           },
           "*"
         );
@@ -635,25 +663,49 @@ const eventTypeMutations = {
     _: any,
     params: DeleteEventTypeParams,
     ctx: GraphQlContext
-  ): Promise<EventType> => {
+  ): Promise<String> => {
     try {
       const { req } = ctx;
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
-
       const { id: userId } = req.session.user as TUserSessionData;
+
+      await eventTypeDeleteParamsValidationSchema.validateAsync(params);
+
       const { dbClient } = ctx.services;
       const { eventTypeId } = params;
 
-      const deletedEventType = await dbClient("event_types")
-        .delete("*")
+      const eventTypeList = await dbClient("event_types")
+        .select("schedule_id")
         .where("id", eventTypeId)
         .andWhere("user_id", userId);
-
-      if (!deletedEventType.length)
+      if (!eventTypeList.length)
         throw new GraphQLError("You have no event type with associated id!");
 
-      return deletedEventType[0];
+      // delete event type questions
+      const deletedEventTypeQuestions = await dbClient("event_type_questions")
+        .delete("*")
+        .where("event_type_id", eventTypeId);
+      const questionIds = deletedEventTypeQuestions.map(
+        (question) => question.id
+      );
+
+      await dbClient("event_type_question_possible_answers")
+        .delete()
+        .whereIn("question_id", questionIds);
+
+      // delete event type schedule and schedule periods
+      await dbClient("schedules")
+        .delete()
+        .where("id", eventTypeList[0].schedule_id);
+      await dbClient("schedule_periods")
+        .delete()
+        .where("schedule_id", eventTypeList[0].schedule_id);
+
+      // delete event type
+      await dbClient("event_types").delete().where("id", eventTypeId);
+
+      return eventTypeId;
     } catch (err) {
       return handleGraphqlError(err, {
         server: "EventType.deleteEventType resolver error",
@@ -670,13 +722,19 @@ const eventTypeMutations = {
       const { req } = ctx;
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
+      const { id: userId } = req.session.user as TUserSessionData;
 
       await eventTypeScheduleUpdateParamsValidationSchema.validateAsync(params);
-
-      const { id: userId } = req.session.user as TUserSessionData;
-      const { dbClient } = ctx.services;
       const { eventTypeId, params: updateParams } = params;
       const { schedule } = updateParams;
+
+      const arePeriodsValid = areSchedulePeriodsValid(schedule.periods);
+      if (!arePeriodsValid)
+        throw new GraphQLError(
+          "The schedule periods you provided are not valid!"
+        );
+
+      const { dbClient } = ctx.services;
 
       // check if event type with id belongs to user
       const eventTypeList = await dbClient("event_types")
@@ -711,7 +769,10 @@ const eventTypeMutations = {
 
       // update event type schedule foreign key
       await dbClient("event_types")
-        .update({ schedule_id: updatedSchedule.id })
+        .update({
+          schedule_id: updatedSchedule.id,
+          updated_at: dayjs().toISOString(),
+        })
         .where("id", eventTypeId);
 
       return {
@@ -734,8 +795,10 @@ const eventTypeMutations = {
       const { req } = ctx;
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
-
       const { id: userId } = req.session.user as TUserSessionData;
+
+      await eventTypeUpdatePaymentParamsValidationSchema.validateAsync(params);
+
       const { dbClient, stripeApi } = ctx.services;
 
       // check if event type with id belongs to user
@@ -772,8 +835,6 @@ const eventTypeMutations = {
           "You cannot make updates to an event type payment options without providing all requested information to Stripe!"
         );
 
-      await eventTypeUpdatePaymentParamsValidationSchema.validateAsync(params);
-
       const { params: updateParams } = params;
       const { collectsPayments, paymentFee } = updateParams;
 
@@ -784,6 +845,7 @@ const eventTypeMutations = {
       let paymentUpdateFields: Partial<EventType> = {
         collects_payments: collectsPayments,
         payment_fee: paymentFee,
+        updated_at: dayjs().toISOString(),
       };
 
       if (collectsPayments && !eventType.collects_payments) {
@@ -799,15 +861,33 @@ const eventTypeMutations = {
           stripe_price_id: priceWithProduct.id,
         };
       } else if (collectsPayments && eventType.collects_payments) {
-        if (paymentFee !== eventType.payment_fee && eventType.stripe_price_id) {
+        if (paymentFee !== eventType.payment_fee) {
           // fees differ => update stripe's price unit amount
-          await stripeApi.updatePriceAmount({
+          await stripeApi.archivePriceAndProduct({
             accountId: user.stripe_account_id,
-            priceId: eventType.stripe_price_id,
+            priceId: eventType.stripe_price_id as string,
+            productId: eventType.stripe_product_id as string,
+          });
+
+          const newPriceWithProduct = await stripeApi.createProductWithPrice({
+            productName: eventType.name,
+            accountId: user.stripe_account_id,
             unitPrice: paymentFee as number,
           });
+
+          paymentUpdateFields = {
+            ...paymentUpdateFields,
+            stripe_price_id: newPriceWithProduct.id,
+            stripe_product_id: newPriceWithProduct.product as string,
+          };
         }
       } else if (!collectsPayments && eventType.collects_payments) {
+        await stripeApi.archivePriceAndProduct({
+          accountId: user.stripe_account_id,
+          priceId: eventType.stripe_price_id as string,
+          productId: eventType.stripe_product_id as string,
+        });
+
         paymentUpdateFields = {
           ...paymentUpdateFields,
           payment_fee: null,
@@ -859,7 +939,7 @@ const eventTypeMutations = {
       const { questions } = updateParams;
 
       const eventQuestions = await dbClient("event_type_questions")
-        .select("id")
+        .delete("id")
         .where("event_type_id", eventTypeId);
       const questionIds = eventQuestions.map((q) => q.id);
 
@@ -867,9 +947,6 @@ const eventTypeMutations = {
       await dbClient("event_type_question_possible_answers")
         .delete()
         .whereIn("question_id", questionIds);
-      await dbClient("event_type_questions")
-        .delete()
-        .whereIn("id", questionIds);
 
       // create questions
       const questionFields = questions.map((question, idx) => ({
@@ -884,7 +961,6 @@ const eventTypeMutations = {
         "*"
       );
 
-      // create questions potential answers
       const possibleAnswersFields = questions
         .map((question, idx) => {
           const createdQuestionId = createdQuestions[idx].id;
@@ -899,12 +975,15 @@ const eventTypeMutations = {
         .filter((possibleAnswer) => possibleAnswer !== undefined)
         .flat() as { question_id: string; value: string }[];
 
-      await dbClient("event_type_question_possible_answers").insert(
-        possibleAnswersFields
-      );
+      if (possibleAnswersFields.length !== 0)
+        await dbClient("event_type_question_possible_answers").insert(
+          possibleAnswersFields
+        );
 
       const updatedEventType = (
-        await dbClient("event_types").select("*").where("id", eventTypeId)
+        await dbClient("event_types")
+          .update({ updated_at: dayjs().toISOString() }, "*")
+          .where("id", eventTypeId)
       )[0];
 
       return updatedEventType;

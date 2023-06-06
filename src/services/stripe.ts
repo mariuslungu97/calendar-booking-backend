@@ -8,20 +8,18 @@ import {
   TStripeCreateAccountParams,
   TStripeRetrieveAccountParams,
   TStripeCreateAccountLinkParams,
-  TStripeUpdatePriceAmountParams,
   TStripeCreateProductWithPriceParams,
   TStripeCreatePaymentSessionParams,
   TStripeConstructWebhookEventParams,
+  TStripeArchivePriceAndProductParams,
 } from "../types";
 
-const { uri } = config.app;
 const {
   apiKey,
   accountLinkRefreshUri,
   accountLinkReturnUri,
   paymentSuccessUri,
   paymentCancelUri,
-  webhookEndpointsSecret,
 } = config.stripe;
 
 const stripe = new Stripe(apiKey, { apiVersion: "2022-11-15" });
@@ -30,15 +28,14 @@ const createAccount = async (
   params: TStripeCreateAccountParams
 ): Promise<Stripe.Account> => {
   try {
-    const { firstName, lastName, email } = params;
+    const { firstName, lastName, email, businessType } = params;
     const newAccount: Stripe.Account = await stripe.accounts.create({
-      type: "express",
       email,
-      individual: {
-        email,
-        first_name: firstName,
-        last_name: lastName,
-      },
+      type: "express",
+      business_type: businessType as Stripe.AccountCreateParams.BusinessType,
+      ...(businessType === "individual" && {
+        individual: { email, first_name: firstName, last_name: lastName },
+      }),
       capabilities: {
         card_payments: {
           requested: true,
@@ -75,8 +72,8 @@ const createAccountLink = async (
     const { accountId } = params;
     const link: Stripe.AccountLink = await stripe.accountLinks.create({
       account: accountId,
-      refresh_url: `${uri}${accountLinkRefreshUri}`,
-      return_url: `${uri}${accountLinkReturnUri}`,
+      refresh_url: `${accountLinkRefreshUri}`,
+      return_url: `${accountLinkReturnUri}`,
       type: "account_onboarding",
     });
     return link;
@@ -110,19 +107,27 @@ const createProductWithPrice = async (
   }
 };
 
-const updatePriceAmount = async (params: TStripeUpdatePriceAmountParams) => {
+const archivePriceAndProduct = async (
+  params: TStripeArchivePriceAndProductParams
+): Promise<boolean> => {
   try {
-    const { accountId, priceId, unitPrice } = params;
-    const updatedPrice = await stripe.prices.update(
+    const { accountId, priceId, productId } = params;
+
+    await stripe.prices.update(
       priceId,
-      {
-        currency_options: { usd: { unit_amount: unitPrice } },
-      },
+      { active: false },
       { stripeAccount: accountId }
     );
-    return updatedPrice;
+
+    await stripe.products.update(
+      productId,
+      { active: false },
+      { stripeAccount: accountId }
+    );
+
+    return true;
   } catch (err) {
-    logger.info("An error occured whilst trying update the price unit amount");
+    logger.info("An error occured whilst trying to archive the price object");
     throw err;
   }
 };
@@ -149,8 +154,8 @@ const createPaymentSession = async (
         receipt_email: shopperEmail,
       },
       client_reference_id: eventId,
-      success_url: `${uri}${paymentSuccessUri}`,
-      cancel_url: `${uri}${paymentCancelUri}`,
+      success_url: `${paymentSuccessUri}`,
+      cancel_url: `${paymentCancelUri}`,
     });
     return paymentSession;
   } catch (err) {
@@ -160,20 +165,16 @@ const createPaymentSession = async (
 };
 
 const constructWebhookEvent = (params: TStripeConstructWebhookEventParams) =>
-  stripe.webhooks.constructEvent(
-    params.body,
-    params.signature,
-    webhookEndpointsSecret
-  );
+  stripe.webhooks.constructEvent(params.body, params.signature, params.secret);
 
 const stripeApi: IStripeApi = {
   createAccount,
   retrieveAccount,
-  updatePriceAmount,
   createAccountLink,
-  createProductWithPrice,
   createPaymentSession,
   constructWebhookEvent,
+  archivePriceAndProduct,
+  createProductWithPrice,
 };
 
 export default stripeApi;

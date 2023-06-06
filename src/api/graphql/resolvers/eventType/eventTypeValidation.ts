@@ -9,7 +9,7 @@ const availableTimesParamsValidationSchema = Joi.object({
   date: Joi.string()
     .pattern(new RegExp(/^(0?[1-9]|[12][0-9]|3[01])-(0?[1-9]|1[012])-\d{4}$/))
     .required(),
-  timezone: Joi.date().custom(isValidTimeZone).required(),
+  timezone: Joi.string().custom(isValidTimeZone).required(),
 });
 
 const availableDatesParamsValidationSchema = Joi.object({
@@ -20,13 +20,18 @@ const availableDatesParamsValidationSchema = Joi.object({
       "string.pattern.base":
         "The provided month must adhere to the following format: 'MM-YYYY' !",
     }),
-  timezone: Joi.date().custom(isValidTimeZone).required(),
+  timezone: Joi.string().custom(isValidTimeZone).required(),
 });
 
 const eventTypeLocationValidationObj = Joi.object({
   type: Joi.string()
-    .valid(...validLocationTypes)
-    .required(),
+    .allow(...validLocationTypes)
+    .only()
+    .required()
+    .messages({
+      "any.only":
+        "You can only provide one of the following location types: 'G_MEET', 'ADDRESS' or 'PHONE'!",
+    }),
   value: Joi.string(),
 }).custom((obj) => {
   const { type, value } = obj;
@@ -40,20 +45,20 @@ const eventTypeLocationValidationObj = Joi.object({
 });
 
 const eventTypeScheduleValidationObj = Joi.object({
-  timezone: Joi.string().required(),
+  timezone: Joi.string().custom(isValidTimeZone).required(),
   periods: Joi.array()
     .items(
       Joi.object({
         day: Joi.number().integer().min(0).max(6).required(),
         startTime: Joi.string()
-          .pattern(new RegExp(/^[0-2][0-3]:[0-5][0-9]$/))
+          .pattern(new RegExp(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/))
           .required()
           .messages({
             "string.pattern.base":
               "Your start and end times must adhere to the following format: 'HH:mm' !",
           }),
         endTime: Joi.string()
-          .pattern(new RegExp(/^[0-2][0-3]:[0-5][0-9]$/))
+          .pattern(new RegExp(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/))
           .required()
           .messages({
             "string.pattern.base":
@@ -67,8 +72,13 @@ const eventTypeScheduleValidationObj = Joi.object({
 const eventTypeQuestionsValidationArr = Joi.array().items(
   Joi.object({
     type: Joi.string()
-      .valid(...validQuestionTypes)
-      .required(),
+      .allow(...validQuestionTypes)
+      .only()
+      .required()
+      .messages({
+        "any.only":
+          "You can only provide one of the following question types: 'TEXT', 'RADIO' or 'CHECKBOX'",
+      }),
     label: Joi.string().max(100).required(),
     isOptional: Joi.boolean().required(),
     possibleAnswers: Joi.array().items(Joi.string()),
@@ -87,16 +97,16 @@ const eventTypeQuestionsValidationArr = Joi.array().items(
 
 const eventTypeCreateInputValidationSchema = Joi.object({
   name: Joi.string()
-    .max(100)
-    .pattern(new RegExp(/^[a-zA-Z\s]*$/))
+    .max(255)
+    .pattern(new RegExp(/^[a-zA-Z0-9\s]*$/))
     .required()
     .messages({
       "string.pattern.base":
-        "The name can only include alphabetic characters and spaces!",
+        "The name can only include alphanumeric characters and spaces!",
     }),
   link: Joi.string()
     .min(3)
-    .max(50)
+    .max(100)
     .pattern(new RegExp(/^[a-zA-Z0-9_-]*$/))
     .required()
     .messages({
@@ -107,24 +117,38 @@ const eventTypeCreateInputValidationSchema = Joi.object({
     .integer()
     .min(1)
     .max(60 * 24)
-    .required(),
+    .required()
+    .messages({
+      "number.min":
+        "The event type minimum duration must be of at least 1 minute",
+      "number.max":
+        "The event type maximum duration must be of at most 24 hours (1440 minutes)",
+    }),
   collectsPayments: Joi.boolean().required(),
   description: Joi.string(),
-  paymentFee: Joi.number().min(1),
+  paymentFee: Joi.number().min(1).max(1000),
   location: eventTypeLocationValidationObj.required(),
   schedule: eventTypeScheduleValidationObj.required(),
   questions: eventTypeQuestionsValidationArr.required(),
+}).custom((obj) => {
+  const { collectsPayments, paymentFee } = obj;
+  if (collectsPayments && !paymentFee)
+    throw new Error(
+      "You must provide a 'paymentFee' value if you wish to create a payment-collecting event type!"
+    );
+
+  return obj;
 });
 
 const eventTypeUpdateParamsValidationSchema = Joi.object({
-  eventTypeId: Joi.string().required(),
+  eventTypeId: Joi.string().guid().required(),
   params: Joi.object({
     name: Joi.string()
       .max(100)
-      .pattern(new RegExp(/^[a-zA-Z\s]*$/))
+      .pattern(new RegExp(/^[a-zA-Z0-9\s]*$/))
       .messages({
         "string.pattern.base":
-          "The name can only include alphabetic characters and spaces!",
+          "The name can only include alphanumeric characters and spaces!",
       }),
     duration: Joi.number()
       .integer()
@@ -136,29 +160,44 @@ const eventTypeUpdateParamsValidationSchema = Joi.object({
   }),
 });
 
+const eventTypeDeleteParamsValidationSchema = Joi.object({
+  eventTypeId: Joi.string().guid().required(),
+});
+
 const eventTypeScheduleUpdateParamsValidationSchema = Joi.object({
-  eventTypeId: Joi.string().required(),
+  eventTypeId: Joi.string().guid().required(),
   params: Joi.object({
     schedule: eventTypeScheduleValidationObj.required(),
   }),
 });
 
 const eventTypeUpdatePaymentParamsValidationSchema = Joi.object({
-  eventTypeId: Joi.string().required(),
+  eventTypeId: Joi.string().guid().required(),
   params: Joi.object({
     collectsPayments: Joi.boolean().required(),
-    paymentFee: Joi.number().min(1),
+    paymentFee: Joi.number().min(1).max(1000),
   }),
+}).custom((obj) => {
+  const { params } = obj;
+  const { collectsPayments, paymentFee } = params;
+
+  if (collectsPayments && !paymentFee)
+    throw new Error(
+      "You must provide a 'paymentFee' value if you wish to create a payment-collecting event type!"
+    );
+
+  return obj;
 });
 
 const eventTypeUpdateQuestionsParamsValidationSchema = Joi.object({
-  eventTypeId: Joi.string().required(),
+  eventTypeId: Joi.string().guid().required(),
   params: Joi.object({
     questions: eventTypeQuestionsValidationArr.required(),
   }),
 });
 
 export {
+  eventTypeDeleteParamsValidationSchema,
   eventTypeUpdateParamsValidationSchema,
   availableDatesParamsValidationSchema,
   availableTimesParamsValidationSchema,

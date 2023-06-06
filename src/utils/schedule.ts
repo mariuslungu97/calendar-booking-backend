@@ -64,6 +64,17 @@ class TimeSlot {
     return false;
   }
 
+  interactsWith(otherSlot: TimeSlot) {
+    if (
+      this.isWithinBounds(otherSlot) ||
+      this.overlapsWith(otherSlot) ||
+      this.isEnveloped(otherSlot)
+    )
+      return true;
+
+    return false;
+  }
+
   cut(slot: TimeSlot): TimeSlot[] {
     if (this.isWithinBounds(slot)) {
       const areLowerBoundsIdentical = slot.from.isSame(this._from, "minute");
@@ -251,16 +262,20 @@ const dayTimeToDate = (day: number, time: string, tz: string): Dayjs => {
   const timeHour = parseInt(timeStrSplit[0]);
   const timeMinutes = parseInt(timeStrSplit[1]);
 
-  const date = dayjs().day(day).hour(timeHour).minute(timeMinutes);
-  const dateLocal = dayjs.tz(date, tz);
+  const date = dayjs
+    .tz(dayjs(), tz)
+    .day(day)
+    .hour(timeHour)
+    .minute(timeMinutes);
 
-  return dateLocal;
+  return date;
 };
 
 const dateInTimezone = (date: Dayjs, tz: string) => dayjs.tz(date, tz);
 const dateToTimezone = (date: Dayjs, tz: string) => date.tz(tz);
 
 export {
+  TimeSlot,
   getAvailableTimeSlots,
   isTimeSlotAvailable,
   getMonthStartEnd,

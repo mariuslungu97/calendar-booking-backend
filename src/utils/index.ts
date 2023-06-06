@@ -61,7 +61,9 @@ const isValidTimeZone = (tz: string) => {
     Intl.DateTimeFormat(undefined, { timeZone: tz });
     return true;
   } catch (ex) {
-    return false;
+    throw new Error(
+      "The timezone string must be part of the IANA list of available timezones!"
+    );
   }
 };
 

@@ -7,6 +7,7 @@ import { Request, Response } from "express";
 import { Knex } from "knex";
 
 export type TUserSessionData = { id: string; email: string };
+export type TSupportedBusinessType = "individual" | "business";
 
 /**
  * ==========================
@@ -363,6 +364,7 @@ export type TSyncJob = {
  */
 
 export type TStripeCreateAccountParams = {
+  businessType: TSupportedBusinessType;
   firstName: string;
   lastName: string;
   email: string;
@@ -382,10 +384,10 @@ export type TStripeCreateProductWithPriceParams = {
   unitPrice: number;
 };
 
-export type TStripeUpdatePriceAmountParams = {
-  accountId: string;
+export type TStripeArchivePriceAndProductParams = {
   priceId: string;
-  unitPrice: number;
+  productId: string;
+  accountId: string;
 };
 
 export type TStripeCreatePaymentSessionParams = {
@@ -404,9 +406,13 @@ export type TStripeDeleteProductWithPriceParams = {
 export type TStripeConstructWebhookEventParams = {
   body: Buffer | string;
   signature: string;
+  secret: string;
 };
 
 export interface IStripeApi {
+  archivePriceAndProduct: (
+    params: TStripeArchivePriceAndProductParams
+  ) => Promise<boolean>;
   createAccount: (
     params: TStripeCreateAccountParams
   ) => Promise<Stripe.Account>;
@@ -418,9 +424,6 @@ export interface IStripeApi {
   ) => Promise<Stripe.AccountLink>;
   createProductWithPrice: (
     params: TStripeCreateProductWithPriceParams
-  ) => Promise<Stripe.Price>;
-  updatePriceAmount: (
-    params: TStripeUpdatePriceAmountParams
   ) => Promise<Stripe.Price>;
   createPaymentSession: (
     params: TStripeCreatePaymentSessionParams
@@ -604,6 +607,12 @@ export interface ReducedSchedule {
   id: string;
   timezone: string;
   periods: ReducedPeriod[];
+}
+
+export interface SchedulePeriodGraphQl {
+  day: number;
+  startTime: string;
+  endTime: string;
 }
 
 export class JwtError extends Error {

@@ -1,5 +1,10 @@
 const graphQlTypeDefs = `
 
+  enum AllowedBusinessType {
+    individual,
+    business
+  }
+
   enum PaginationOrderType {
     ASC,
     DESC
@@ -147,6 +152,8 @@ const graphQlTypeDefs = `
     isActive: Boolean!
     schedule: Schedule!
     location: EventTypeLocation!
+    createdAt: String!
+    updatedAt: String!
   }
 
   input EventTypeCreateInput {
@@ -269,6 +276,11 @@ const graphQlTypeDefs = `
     edges: [Payment!]!
   }
 
+  """
+    Resolver related response types: 
+      - CreateAccountResponse, LoginResponse, ConnectResponse, BookEventResponse
+  """
+
   type CreateAccountResponse {
     message: String!
   }
@@ -290,9 +302,9 @@ const graphQlTypeDefs = `
   type Query {
     me: User!
     viewBookingInformation(username: String!, eventTypeLink: String!): VisitorEventType!
-    eventTypes(after: String = "", take: Int = 5, order: PaginationOrderType = "DESC"): EventTypeConnections!
-    events(after: String = "", take: Int = 5, order: PaginationOrderType = "DESC"): EventConnections!
-    payments(after: String = "", take: Int = 5, order: PaginationOrderType = "DESC"): PaymentConnections!
+    eventTypes(cursor: String = "", take: Int = 5, order: PaginationOrderType = DESC): EventTypeConnections!
+    events(cursor: String = "", take: Int = 5, order: PaginationOrderType = DESC): EventConnections!
+    payments(cursor: String = "", take: Int = 5, order: PaginationOrderType = DESC): PaymentConnections!
   }
 
   type Mutation {
@@ -300,13 +312,13 @@ const graphQlTypeDefs = `
     login(email: String!, password: String!): LoginResponse!
     toggle2Fa(activate: Boolean!): User!
     connectGoogleCalendar: ConnectResponse!
-    connectStripe: ConnectResponse!
+    connectStripe(businessType: AllowedBusinessType): ConnectResponse!
     createEventType(params: EventTypeCreateInput!): UserEventType!
     updateEventType(eventTypeId: String!, params: EventTypeUpdateInput!): UserEventType!
     updateEventTypeQuestions(eventTypeId: String!, params: EventTypeUpdateQuestionsInput!): UserEventType!
     updateEventTypeSchedule(eventTypeId: String!, params: EventTypeUpdateScheduleInput!): UserEventType!
     updateEventTypePayment(eventTypeId: String!, params: EventTypeUpdatePaymentInput!): UserEventType!
-    deleteEventType(eventTypeId: String!): UserEventType!
+    deleteEventType(eventTypeId: String!): String!
     bookEvent(username: String!, eventTypeLink: String!, params: EventCreateInput!): BookEventResponse!
     updateEventTime(eventId: String!, params: EventUpdateTimeInput!): Event!
     cancelEvent(eventId: String!): Event!

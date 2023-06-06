@@ -119,7 +119,12 @@ const syncCalendarEvent = async (
     if (isCancelled && dbCalendarEvent) {
       await knexClient("calendar_events").del().where("id", dbCalendarEvent.id);
 
-      if (dbCalendarEvent.event_id) {
+      if (!dbCalendarEvent.event_id) {
+        // we can safely delete calendar event associated schedule
+        await knexClient("event_schedules")
+          .del()
+          .where("id", dbCalendarEvent.event_schedule_id);
+      } else if (dbCalendarEvent.event_id) {
         // update event as cancelled and inform invitee
         await knexClient("events")
           .update({

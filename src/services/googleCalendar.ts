@@ -22,8 +22,6 @@ const calendarApi = (
   calendarId = "primary",
   sendCreateDeleteUpdates: TSendUpdates = "none"
 ): IGoogleCalendarApi => {
-  google.options({ auth: authClient });
-
   const createEvent = async (
     input: TCreateEventInput
   ): Promise<calendar_v3.Schema$Event | null> => {
@@ -61,6 +59,7 @@ const calendarApi = (
         calendarId,
         requestBody: event,
         sendUpdates: sendCreateDeleteUpdates,
+        auth: authClient,
       });
       return response.data;
     } catch (err) {
@@ -75,6 +74,7 @@ const calendarApi = (
         calendarId,
         eventId: id,
         sendUpdates: sendCreateDeleteUpdates,
+        auth: authClient,
       });
       return true;
     } catch (err) {
@@ -90,6 +90,7 @@ const calendarApi = (
       const response = await calendar.events.get({
         calendarId,
         eventId: id,
+        auth: authClient,
       });
       return response.data;
     } catch (err) {
@@ -120,6 +121,7 @@ const calendarApi = (
           maxResults: 500,
           singleEvents: true,
           showDeleted: true,
+          auth: authClient,
         });
         const { items, nextPageToken, nextSyncToken } = response.data;
         if (items) events.push(...items);
@@ -144,6 +146,7 @@ const calendarApi = (
     try {
       const response = await calendar.events.watch({
         calendarId,
+        auth: authClient,
         requestBody: {
           expiration,
           id: channelId,
@@ -171,6 +174,7 @@ const calendarApi = (
         return false;
 
       await calendar.channels.stop({
+        auth: authClient,
         requestBody: {
           id: channelId,
           resourceId: primaryCalendarResponse.data.id,

@@ -96,11 +96,11 @@ incrementalSyncWorker.on("failed", async (job, error) => {
     );
 
     if (reason === "USER_NOT_FOUND") {
-      syncApi.stopSyncRoutine(userId);
+      await syncApi.stopSyncRoutine(userId);
     } else if (reason === "SYNC_TOKEN_NOT_FOUND") {
-      syncApi.addOneTimeSyncJob("fullSync", userId, { userId });
+      await syncApi.addOneTimeSyncJob("fullSync", userId, { userId });
     } else if (reason === "INVALID_SYNC_TOKEN") {
-      syncApi.addOneTimeSyncJob("fullSync", userId, { userId });
+      await syncApi.addOneTimeSyncJob("fullSync", userId, { userId });
     }
   }
 });

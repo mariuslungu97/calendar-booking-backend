@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 
 import {
   loginValidationSchema,
+  connectStripeValidationSchema,
   createAccountValidationSchema,
   toggle2FaParamsValidationSchema,
 } from "./userValidation";
@@ -16,6 +17,7 @@ import {
   EventType,
   GraphQlContext,
   TUserSessionData,
+  TSupportedBusinessType,
 } from "../../../../types";
 
 interface CreateAccountInputParams {
@@ -35,6 +37,10 @@ interface LoginParams {
 
 interface Toggle2FaParams {
   activate: boolean;
+}
+
+interface ConnectStripeParams {
+  businessType?: TSupportedBusinessType;
 }
 
 interface CreateAccountResponse {
@@ -215,11 +221,11 @@ const userMutations = {
     ctx: GraphQlContext
   ): Promise<LoginResponse> => {
     try {
-      const { req } = ctx;
-
       await loginValidationSchema.validateAsync(params);
+
       const { email, password } = params;
 
+      const { req } = ctx;
       const { dbClient, emailApi } = ctx.services;
 
       const loggedAccountList = await dbClient("users").where("email", email);
@@ -272,15 +278,14 @@ const userMutations = {
     params: Toggle2FaParams,
     ctx: GraphQlContext
   ): Promise<User> => {
-    await toggle2FaParamsValidationSchema.validateAsync(params);
-
     const { req } = ctx;
-    const { dbClient } = ctx.services;
-
     if (!isLoggedIn(req)) throw new GraphQLError("You are not authenticated!");
-
     const { id } = ctx.req.session.user as TUserSessionData;
+
+    await toggle2FaParamsValidationSchema.validateAsync(params);
     const { activate } = params;
+
+    const { dbClient } = ctx.services;
 
     try {
       const updatedUser = await dbClient("users")
@@ -302,14 +307,13 @@ const userMutations = {
   ): Promise<ConnectResponse> => {
     try {
       const { req } = ctx;
-      const { oAuthApi } = ctx.services;
 
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
-
-      const { dbClient } = ctx.services;
-
       const { id } = ctx.req.session.user as TUserSessionData;
+
+      const { dbClient, oAuthApi } = ctx.services;
+
       const googleConnectionList = await dbClient("oauth_connections")
         .select("user_id")
         .where("user_id", id)
@@ -338,15 +342,17 @@ const userMutations = {
   },
   connectStripe: async (
     _: any,
-    __: any,
+    params: ConnectStripeParams,
     ctx: GraphQlContext
   ): Promise<ConnectResponse> => {
     const { req } = ctx;
-    const { dbClient, stripeApi } = ctx.services;
-
     if (!isLoggedIn(req)) throw new GraphQLError("You are not authenticated!");
-
     const { id } = ctx.req.session.user as TUserSessionData;
+
+    await connectStripeValidationSchema.validateAsync(params);
+    const { businessType } = params;
+
+    const { dbClient, stripeApi } = ctx.services;
 
     try {
       const user = (await dbClient("users").select("*").where("id", id))[0];
@@ -354,20 +360,46 @@ const userMutations = {
       let stripeAccountId: string;
 
       if (user.stripe_account_id) {
-        // stripe account already exists
         stripeAccountId = user.stripe_account_id;
         const areDetailsSubmitted = (
           await dbClient("stripe_accounts")
             .select("details_submitted")
             .where("id", user.stripe_account_id)
         )[0].details_submitted;
+
         if (areDetailsSubmitted)
           throw new GraphQLError("You are already connected to Stripe!");
+
+        if (!user.is_2fa_activated) {
+          throw new GraphQLError(
+            "You can only connect to Stripe if you have 2-factor authentication enabled!"
+          );
+        } else if (!user.is_email_verified) {
+          throw new GraphQLError(
+            "You can only connect to Stripe if your email is verified!"
+          );
+        }
       } else {
+        if (!user.is_2fa_activated) {
+          throw new GraphQLError(
+            "You can only connect to Stripe if you have 2-factor authentication enabled!"
+          );
+        } else if (!user.is_email_verified) {
+          throw new GraphQLError(
+            "You can only connect to Stripe if your email is verified!"
+          );
+        }
+
+        if (!businessType)
+          throw new GraphQLError(
+            "You must provide a valid business type when connecting to Stripe!"
+          );
+
         const stripeAccount = await stripeApi.createAccount({
+          businessType,
           email: user.email,
-          firstName: user.first_name,
           lastName: user.last_name,
+          firstName: user.first_name,
         });
 
         await dbClient("stripe_accounts").insert({
@@ -384,6 +416,7 @@ const userMutations = {
       const stripeAccountLink = await stripeApi.createAccountLink({
         accountId: stripeAccountId,
       });
+
       return {
         message: "Follow the redirect link to connect to your Stripe Account!",
         redirect: stripeAccountLink.url,

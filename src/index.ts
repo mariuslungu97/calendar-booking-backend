@@ -17,7 +17,7 @@ import fullSyncCalendarWorker from "./workers/fullSync";
 import incrementalSyncCalendarWorker from "./workers/incrementalSync";
 import refreshNotificationChannelsWorker from "./workers/refreshNotificationsChannel";
 
-const startWorkers = async () => {
+const startWorkers = () => {
   logger.info("Starting application workers!");
   mailTransportWorker.run();
   fullSyncCalendarWorker.run();

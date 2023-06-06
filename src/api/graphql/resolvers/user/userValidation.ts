@@ -40,8 +40,16 @@ const toggle2FaParamsValidationSchema = Joi.object({
   activate: Joi.boolean().required(),
 });
 
+const connectStripeValidationSchema = Joi.object({
+  businessType: Joi.string().allow("individual", "business").only().messages({
+    "any.only":
+      "The supported business types are: 'individual' and 'business'!",
+  }),
+});
+
 export {
-  createAccountValidationSchema,
   loginValidationSchema,
+  connectStripeValidationSchema,
+  createAccountValidationSchema,
   toggle2FaParamsValidationSchema,
 };

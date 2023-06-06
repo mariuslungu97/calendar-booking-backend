@@ -6,6 +6,7 @@ import { GraphQLError } from "graphql";
 import { ValidationError } from "joi";
 
 import {
+  TimeSlot,
   getAvailableTimeSlots,
   isTimeSlotAvailable,
   getMonthStartEnd,
@@ -23,6 +24,7 @@ import {
   AvailableDate,
   AvailableTimeSlot,
   SchedulePeriod,
+  SchedulePeriodGraphQl,
   ReducedPeriod,
   TDayjsSlot,
 } from "../types";
@@ -122,38 +124,36 @@ const retrieveAvailableDates = async (
 
     // grab all calendar events within given month in UTC
     const [monthStart, monthEnd] = getMonthStartEnd(month);
-    const monthStartUtc = dateToTimezone(
-      dateInTimezone(monthStart, timezone),
-      "Etc/UTC"
-    );
-    const monthEndUtc = dateToTimezone(
-      dateInTimezone(monthEnd, timezone),
-      "Etc/UTC"
-    );
+    const monthStartLocal = dateInTimezone(monthStart, timezone);
+    const monthEndLocal = dateInTimezone(monthEnd, timezone);
 
     // avoid retrieving events in the past
     const eventsStartDate =
       visitorCurrentDate.month() === monthStart.month()
-        ? dateToTimezone(visitorCurrentDate, "Etc/UTC")
-        : monthStartUtc;
+        ? visitorCurrentDate
+        : monthStartLocal;
 
-    const eventsEndDate = monthEndUtc.add(1, "day");
+    const eventsEndDate = monthEndLocal.add(1, "day");
 
     const calendarEvents = await knexClient("calendar_events")
       .select("*")
       .leftJoin(
         "event_schedules",
-        "calendar_events.schedule_id",
+        "calendar_events.event_schedule_id",
         "event_schedules.id"
       )
-      .where("event_schedules.end_date_time", ">", eventsStartDate.unix())
-      .where("event_schedules.end_date_time", "<", eventsEndDate.unix());
+      .where(
+        "event_schedules.end_date_time",
+        ">",
+        eventsStartDate.toISOString()
+      )
+      .where("event_schedules.end_date_time", "<", eventsEndDate.toISOString());
 
     // convert calendar events to visitor's timezone
     const tzCalendarEvents = calendarEvents.map((event) => ({
       ...event,
-      start_date_time: dateToTimezone(event.start_date_time, timezone),
-      end_date_time: dateToTimezone(event.end_date_time, timezone),
+      start_date_time: dateToTimezone(dayjs(event.start_date_time), timezone),
+      end_date_time: dateToTimezone(dayjs(event.end_date_time), timezone),
     }));
 
     // compute available events for each day of the month
@@ -260,31 +260,29 @@ const retrieveAvailableTimes = async (
 
     // grab all calendar events within given month in UTC
     const [dateStart, dateEnd] = getDateStartEnd(date);
-    const dateStartUtc = dateToTimezone(
-      dateInTimezone(dateStart, timezone),
-      "Etc/UTC"
-    );
-    const dateEndUtc = dateToTimezone(
-      dateInTimezone(dateEnd, timezone),
-      "Etc/UTC"
-    );
+    const dateStartLocal = dateInTimezone(dateStart, timezone);
+    const dateEndLocal = dateInTimezone(dateEnd, timezone);
 
     // avoid retrieving events in the past
-    const eventsStartDate = visitorCurrentDate.isAfter(dateStart)
-      ? dateToTimezone(dateStart, "Etc/UTC")
-      : dateStartUtc;
+    const eventsStartDate = visitorCurrentDate.isSame(dateStartLocal, "date")
+      ? visitorCurrentDate
+      : dateStartLocal;
 
-    const eventsEndDate = dateEndUtc.add(1, "day");
+    const eventsEndDate = dateEndLocal.add(1, "day");
 
     const calendarEvents = await knexClient("calendar_events")
       .select("*")
       .leftJoin(
         "event_schedules",
-        "calendar_events.schedule_id",
+        "calendar_events.event_schedule_id",
         "event_schedules.id"
       )
-      .where("event_schedules.end_date_time", ">", eventsStartDate.unix())
-      .where("event_schedules.end_date_time", "<", eventsEndDate.unix());
+      .where(
+        "event_schedules.end_date_time",
+        ">",
+        eventsStartDate.toISOString()
+      )
+      .where("event_schedules.end_date_time", "<", eventsEndDate.toISOString());
 
     const schedule = tzPeriods
       .filter((period) => period.day === dateStart.day())
@@ -294,8 +292,8 @@ const retrieveAvailableTimes = async (
       ]) as TDayjsSlot[];
     const bookedSlots = calendarEvents
       .map((event) => ({
-        start_date_time: dateToTimezone(event.start_date_time, timezone),
-        end_date_time: dateToTimezone(event.end_date_time, timezone),
+        start_date_time: dateToTimezone(dayjs(event.start_date_time), timezone),
+        end_date_time: dateToTimezone(dayjs(event.end_date_time), timezone),
       }))
       .map((event) => [
         event.start_date_time,
@@ -330,7 +328,7 @@ const isDateAvailable = async (
 ): Promise<boolean> => {
   try {
     // dates expected as UTC unix timestamps
-    const [startDateUnixUTC, endDateUnixUTC] = date;
+    const [startDateISO, endDateISO] = date;
 
     const scheduleWithPeriods = await retrieveUserScheduleWithPeriods(
       eventType.schedule_id
@@ -343,21 +341,18 @@ const isDateAvailable = async (
       "Etc/UTC"
     );
 
-    const dateStart = dateInTimezone(dayjs(startDateUnixUTC), "Etc/UTC");
-    const dateEnd = dateInTimezone(dayjs(endDateUnixUTC), "Etc/UTC").add(
-      1,
-      "day"
-    );
+    const dateStart = dayjs(startDateISO);
+    const dateEnd = dayjs(endDateISO).add(1, "day");
 
     const calendarEvents = await knexClient("calendar_events")
       .select("*")
       .leftJoin(
         "event_schedules",
-        "calendar_events.schedule_id",
+        "calendar_events.event_schedule_id",
         "event_schedules.id"
       )
-      .where("event_schedules.end_date_time", ">", dateStart.unix())
-      .where("event_schedules.end_date_time", "<", dateEnd.unix());
+      .where("event_schedules.end_date_time", ">", dateStart.toISOString())
+      .where("event_schedules.end_date_time", "<", dateEnd.toISOString());
 
     const schedule = tzPeriods
       .filter(
@@ -370,8 +365,8 @@ const isDateAvailable = async (
       ]) as TDayjsSlot[];
 
     const bookedSlots = calendarEvents.map((event) => [
-      dateInTimezone(event.start_date_time, "Etc/UTC"),
-      dateInTimezone(event.end_date_time, "Etc/UTC"),
+      dayjs(event.start_date_time),
+      dayjs(event.end_date_time),
     ]) as TDayjsSlot[];
 
     const isAvailable = isTimeSlotAvailable(schedule, bookedSlots, [
@@ -386,6 +381,57 @@ const isDateAvailable = async (
     );
     throw err;
   }
+};
+
+const areSchedulePeriodsValid = (periods: SchedulePeriodGraphQl[]) => {
+  const insertAt = (arr: TimeSlot[], curr: TimeSlot) => {
+    if (arr.length === 0) return 0;
+    let idx = 0;
+    while (idx < arr.length) {
+      if (curr.from.isAfter(arr[idx].from)) idx++;
+      else return idx;
+    }
+    return idx;
+  };
+
+  let periodsByDays = Array.from(Array(7), () => new Array()) as TimeSlot[][];
+  periodsByDays = periods.reduce((acc, period) => {
+    const periodTs = new TimeSlot(
+      dayjs(period.startTime, "HH:mm"),
+      dayjs(period.endTime, "HH:mm")
+    );
+    acc[period.day].splice(insertAt(acc[period.day], periodTs), 0, periodTs);
+    return acc;
+  }, periodsByDays);
+
+  for (const dailyPeriods of periodsByDays) {
+    if (dailyPeriods.length < 2) continue;
+
+    for (let i = 0; i < dailyPeriods.length - 1; i++) {
+      if (dailyPeriods[i].interactsWith(dailyPeriods[i + 1])) return false;
+    }
+  }
+
+  return true;
+};
+
+const parsePaginationCursor = (cursor: string): [boolean, string] => {
+  const decodedCursor = Buffer.from(cursor, "base64").toString("ascii");
+  const decodedCursorParts = decodedCursor.split("__");
+
+  if (
+    decodedCursorParts.length !== 2 ||
+    (decodedCursorParts[0] !== "next" && decodedCursorParts[0] !== "prev") ||
+    !dayjs.unix(parseFloat(decodedCursorParts[1])).isValid()
+  )
+    throw new GraphQLError(
+      "The decoded cursor you provided does not adhere to the required shape: next|prev__unix"
+    );
+
+  const isNext = decodedCursorParts[0] === "next";
+  const timestamp = dayjs.unix(parseFloat(decodedCursorParts[1])).toISOString();
+
+  return [isNext, timestamp];
 };
 
 type TErrorInfo = {
@@ -411,6 +457,8 @@ const handleGraphqlError = (error: any, info: TErrorInfo): never => {
 export {
   isDateAvailable,
   handleGraphqlError,
+  parsePaginationCursor,
   retrieveAvailableDates,
   retrieveAvailableTimes,
+  areSchedulePeriodsValid,
 };

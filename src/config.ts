@@ -59,10 +59,20 @@ const config = {
   },
   stripe: {
     apiKey: mandatoryEnv(process.env.STRIPE_API_KEY, "STRIPE_API_KEY"),
-    webhookEndpointsSecret: mandatoryEnv(
-      process.env.STRIPE_WEBHOOK_ENDPOINTS_SECRET,
-      "STRIPE_WEBHOOK_ENDPOINTS_SECRET"
-    ),
+    secrets: {
+      accountsUpdateWebhook: mandatoryEnv(
+        process.env.STRIPE_WEBHOOK_ACCOUNTS_UPDATE_SECRET,
+        "STRIPE_WEBHOOK_ACCOUNTS_UPDATE_SECRET"
+      ),
+      checkoutsSuccessWebhook: mandatoryEnv(
+        process.env.STRIPE_WEBHOOK_CHECKOUTS_SUCCESS_SECRET,
+        "STRIPE_WEBHOOK_CHECKOUTS_SUCCESS_SECRET"
+      ),
+      checkoutsFailureWebhook: mandatoryEnv(
+        process.env.STRIPE_WEBHOOK_CHECKOUTS_FAILURE_SECRET,
+        "STRIPE_WEBHOOK_CHECKOUTS_FAILURE_SECRET"
+      ),
+    },
     accountLinkRefreshUri: webClientUri + "/stripe/connect/refresh",
     accountLinkReturnUri: webClientUri + "/stripe/connect/return",
     paymentSuccessUri: webClientUri,

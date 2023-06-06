@@ -1,9 +1,15 @@
-import { GraphQLError } from "graphql";
 import dayjs from "dayjs";
+import { GraphQLError } from "graphql";
+import { calendar_v3 } from "googleapis";
 
-import { isDateAvailable } from "../../../../utils/api";
-import { handleGraphqlError } from "../../../../utils/api";
+import { isLoggedIn } from "../../../middleware/auth";
+import {
+  isDateAvailable,
+  handleGraphqlError,
+  parsePaginationCursor,
+} from "../../../../utils/api";
 
+import { cursorPaginationParamsValidationSchema } from "../validation";
 import {
   bookEventParamsValidationSchema,
   cancelEventParamsValidationSchema,
@@ -18,8 +24,6 @@ import {
   TUserSessionData,
   PageInfo,
 } from "../../../../types";
-import { calendar_v3 } from "googleapis";
-import { isLoggedIn } from "../../../middleware/auth";
 
 interface EventAnswer {
   questionId: string;
@@ -181,26 +185,40 @@ const eventQueries = {
   ): Promise<EventConnections> => {
     try {
       const { req } = ctx;
-
       if (!isLoggedIn(req))
         throw new GraphQLError("You are not authenticated!");
+
+      await cursorPaginationParamsValidationSchema.validateAsync(params);
 
       const { dbClient } = ctx.services;
       const { id: userId } = req.session.user as TUserSessionData;
       const { cursor, order, take } = params;
 
-      const decodedCursor = Buffer.from(cursor, "base64").toString("ascii");
-      const isNext = decodedCursor.split("__")[0];
-      const timestamp = decodedCursor.split("__")[1];
-      const operator = isNext ? "<" : ">";
-      // reverse orders if we're going back
-      const updatedOrder = isNext ? order : order === "DESC" ? "ASC" : "DESC";
-      const events = await dbClient("events")
+      let isNext = true;
+      let timestamp = "";
+      let operator = "<"; // based on isNext == true && order == "DESC"
+
+      if (cursor !== "") {
+        const decodedCursorResponse = parsePaginationCursor(cursor);
+        isNext = decodedCursorResponse[0];
+        timestamp = decodedCursorResponse[1];
+      }
+
+      if (isNext && order === "ASC") operator = ">";
+      else if (!isNext && order === "ASC") operator = "<";
+      else if (isNext && order === "DESC") operator = "<";
+      else if (!isNext && order === "DESC") operator = ">";
+
+      const eventsQuery = dbClient("events")
         .select("*")
         .where("user_id", userId)
-        .andWhere("created_at", operator, timestamp)
-        .orderBy("created_at", updatedOrder)
+        .orderBy("created_at", order)
         .limit(take);
+
+      if (timestamp !== "")
+        eventsQuery.andWhere("created_at", operator, timestamp);
+
+      const events = await eventsQuery;
 
       if (!events.length)
         return {
@@ -208,32 +226,35 @@ const eventQueries = {
           edges: [],
         };
 
-      const firstEventType = events[0];
-      const lastEventType = events[events.length - 1];
+      const firstEvent = events[0];
+      const lastEvent = events[events.length - 1];
 
-      const prevEvent = await dbClient("events")
+      const prevOperator = order === "DESC" ? ">" : "<";
+      const prevEventType = await dbClient("events")
         .select("created_at")
         .where("user_id", userId)
-        .andWhere("created_at", operator, firstEventType.created_at)
-        .orderBy("created_at", updatedOrder)
+        .andWhere("created_at", prevOperator, firstEvent.created_at)
+        .orderBy("created_at", order)
         .limit(1);
-      const nextEvent = await dbClient("events")
+      const nextEventType = await dbClient("events")
         .select("created_at")
         .where("user_id", userId)
-        .andWhere("created_at", operator, lastEventType.created_at)
-        .orderBy("created_at", updatedOrder)
+        .andWhere("created_at", operator, lastEvent.created_at)
+        .orderBy("created_at", order)
         .limit(1);
 
       const pageInfo: PageInfo = {
-        nextPage: prevEvent.length
-          ? Buffer.from(`next__${prevEvent[0].created_at}`, "ascii").toString(
-              "base64"
-            )
+        nextPage: nextEventType.length
+          ? Buffer.from(
+              `next__${dayjs(lastEvent.created_at).unix()}`,
+              "ascii"
+            ).toString("base64")
           : null,
-        previousPage: nextEvent.length
-          ? Buffer.from(`prev__${nextEvent[0].created_at}`, "ascii").toString(
-              "base64"
-            )
+        previousPage: prevEventType.length
+          ? Buffer.from(
+              `prev__${dayjs(firstEvent.created_at).unix()}`,
+              "ascii"
+            ).toString("base64")
           : null,
         order,
         take,
@@ -496,10 +517,10 @@ const eventMutations = {
     try {
       const { req } = ctx;
       if (!isLoggedIn(req)) throw new Error("You are not authenticated!");
+      const { id: userId } = req.session.user as TUserSessionData;
 
       await updateEventTimeParamsValidationSchema.validateAsync(params);
 
-      const { id: userId } = req.session.user as TUserSessionData;
       const { dbClient } = ctx.services;
       const { eventId, params: updateTimeParams } = params;
       const { startDateTime, endDateTime } = updateTimeParams;
@@ -574,13 +595,12 @@ const eventMutations = {
     try {
       const { req } = ctx;
       if (!isLoggedIn(req)) throw new Error("You are not authenticated!");
-
       const { id: userId } = req.session.user as TUserSessionData;
 
       await cancelEventParamsValidationSchema.validateAsync(params);
+      const { eventId } = params;
 
       const { dbClient, emailApi } = ctx.services;
-      const { eventId } = params;
 
       const eventList = await dbClient("events")
         .select("id")

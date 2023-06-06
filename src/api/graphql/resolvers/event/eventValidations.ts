@@ -21,15 +21,15 @@ const bookEventParamsValidationSchema = Joi.object({
 });
 
 const updateEventTimeParamsValidationSchema = Joi.object({
-  eventId: Joi.string().required(),
+  eventId: Joi.string().guid().required(),
   params: Joi.object({
-    startDateTime: Joi.date().timestamp("unix").required(),
-    endDateTime: Joi.date().timestamp("unix").required(),
+    startDateTime: Joi.date().iso().required(),
+    endDateTime: Joi.date().iso().required(),
   }),
 });
 
 const cancelEventParamsValidationSchema = Joi.object({
-  eventId: Joi.string().required(),
+  eventId: Joi.string().guid().required(),
 });
 
 export {

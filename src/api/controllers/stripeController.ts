@@ -1,11 +1,23 @@
 import Stripe from "stripe";
 import { Request, Response } from "express";
+import dayjs from "dayjs";
 
+import config from "../../config";
 import knex from "../../loaders/knex";
 import mailService from "../../services/mail";
 import stripeApi from "../../services/stripe";
+import calendarApi from "../../services/googleCalendar";
+import googleAuthStore from "../../services/googleAuthClients";
+
+import logger from "../../loaders/logger";
 
 import { Event } from "../../types";
+
+const {
+  accountsUpdateWebhook,
+  checkoutsSuccessWebhook,
+  checkoutsFailureWebhook,
+} = config.stripe.secrets;
 
 const accountUpdateEventHandler = async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"] as string;
@@ -14,9 +26,8 @@ const accountUpdateEventHandler = async (req: Request, res: Response) => {
     const accountUpdateEvent = stripeApi.constructWebhookEvent({
       body: req.body,
       signature: sig,
+      secret: accountsUpdateWebhook,
     });
-
-    res.status(200).json({});
 
     const updatedAccount = accountUpdateEvent.data.object as Stripe.Account;
 
@@ -32,7 +43,7 @@ const accountUpdateEventHandler = async (req: Request, res: Response) => {
       );
 
     const capabilitiesEnabled = capabilities
-      ? Object.values(capabilities).every((status) => status === true)
+      ? Object.values(capabilities).every((status) => status === "active")
       : existingStripeRecordList[0].capabilities_enabled;
 
     await knex("stripe_accounts")
@@ -40,10 +51,14 @@ const accountUpdateEventHandler = async (req: Request, res: Response) => {
         details_submitted,
         charges_enabled,
         capabilities_enabled: capabilitiesEnabled,
-        updated_at: Date.now().toString(),
+        updated_at: dayjs().toISOString(),
       })
       .where("id", id);
+
+    res.status(200).json({});
   } catch (err) {
+    logger.info("Encountered Stripe account update event error!");
+    logger.info(err);
     res.status(400).send(`Webhook Error: ${(err as any).message}`);
     return;
   }
@@ -59,9 +74,8 @@ const checkoutSessionSuccessEventHandler = async (
     const sessionSuccessEvent = stripeApi.constructWebhookEvent({
       body: req.body,
       signature: sig,
+      secret: checkoutsSuccessWebhook,
     });
-
-    res.status(200).json({});
 
     const session = sessionSuccessEvent.data.object as Stripe.Checkout.Session;
 
@@ -79,7 +93,7 @@ const checkoutSessionSuccessEventHandler = async (
       .update({
         status: "SUCCESS",
         processor_payload: JSON.stringify(session),
-        updated_at: Date.now().toString(),
+        updated_at: dayjs().toISOString(),
       })
       .where("stripe_session_id", id);
 
@@ -118,6 +132,8 @@ const checkoutSessionSuccessEventHandler = async (
         },
       },
     });
+
+    res.status(200).json({});
   } catch (err) {
     res.status(400).send(`Webhook Error: ${(err as any).message}`);
     return;
@@ -134,9 +150,8 @@ const checkoutSessionFailureEventHandler = async (
     const sessionFailureEvent = stripeApi.constructWebhookEvent({
       body: req.body,
       signature: sig,
+      secret: checkoutsFailureWebhook,
     });
-
-    res.status(200).json({});
 
     const session = sessionFailureEvent.data.object as Stripe.Checkout.Session;
 
@@ -153,7 +168,7 @@ const checkoutSessionFailureEventHandler = async (
     await knex("payments")
       .update({
         status: "FAIL",
-        updated_at: Date.now().toString(),
+        updated_at: dayjs().toISOString(),
         processor_payload: JSON.stringify(session),
       })
       .where("id", paymentRecordList[0].id);
@@ -165,8 +180,28 @@ const checkoutSessionFailureEventHandler = async (
         .where("payment_id", paymentRecordList[0].id)
     )[0] as Event;
 
+    const calendarEventGoogleId = (
+      await knex("calendar_events")
+        .select("google_id")
+        .where("event_id", updatedEvent.id)
+    )[0].google_id;
+
     // delete calendar event
     await knex("calendar_events").delete().where("event_id", updatedEvent.id);
+
+    if (calendarEventGoogleId) {
+      // delete google calendar event
+      const userId = (
+        await knex("users").select("id").where("id", updatedEvent.user_id)
+      )[0].id;
+      const authClient = googleAuthStore.getClient(userId);
+      if (authClient) {
+        const { deleteEvent } = calendarApi(authClient);
+        deleteEvent(calendarEventGoogleId);
+      }
+    }
+
+    res.status(200).json({});
   } catch (err) {
     res.status(400).send(`Webhook Error: ${(err as any).message}`);
     return;

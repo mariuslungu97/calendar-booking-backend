@@ -61,7 +61,6 @@ const startSyncRoutine = async (userId: string) => {
       const isWatching = watchPrimaryCalendar({
         channelId: userId,
         expiration: expirationDate.toISOString(),
-        address: `${config.app.uri}${config.google.calendarWebhookUri}`,
       });
       if (!isWatching)
         throw new Error("Did not manage to start watching primary calendar!");
@@ -119,15 +118,14 @@ const addOneTimeSyncJob = async (
   jobData: TSyncJob,
   jobOptions?: JobsOptions
 ) => {
+  logger.info(`Adding one time Google Calendar sync job!`);
+
   if (type === "fullSync")
-    await fullSyncQueue.add(type, jobData, { ...jobOptions, jobId });
+    await fullSyncQueue.add("full", jobData, { ...jobOptions, jobId });
   else if (type === "incrementalSync")
-    await incrementalSyncQueue.add(type, jobData, { ...jobOptions, jobId });
+    await incrementalSyncQueue.add("incremental", jobData, { ...jobOptions, jobId }); // prettier-ignore
   else if (type === "channelRefresh")
-    await notificationChannelsRefreshQueue.add(type, jobData, {
-      ...jobOptions,
-      jobId,
-    });
+    await notificationChannelsRefreshQueue.add("refresh", jobData, { ...jobOptions, jobId }); // prettier-ignore
 };
 
 const isUserInSync = async (userId: string) => {

@@ -18,7 +18,14 @@ export async function up(knex: Knex): Promise<void> {
                 .defaultTo(false)
                 .notNullable();
 
-              table.timestamps(true, true);
+              table
+                .timestamp("created_at", { precision: 0 })
+                .defaultTo(knex.fn.now(0))
+                .notNullable();
+              table
+                .timestamp("updated_at", { precision: 0 })
+                .defaultTo(knex.fn.now(0))
+                .notNullable();
             });
           }
           return;
@@ -64,7 +71,10 @@ export async function up(knex: Knex): Promise<void> {
 
                 table.string("calendar_sync_token");
 
-                table.timestamp("created_at").defaultTo(knex.fn.now());
+                table
+                  .timestamp("created_at", { precision: 0 })
+                  .defaultTo(knex.fn.now(0))
+                  .notNullable();
               });
             }
             return;
@@ -84,7 +94,10 @@ export async function up(knex: Knex): Promise<void> {
                 table.string("access_token").notNullable();
                 table.string("refresh_token");
 
-                table.timestamp("created_at").defaultTo(knex.fn.now());
+                table
+                  .timestamp("created_at", { precision: 0 })
+                  .defaultTo(knex.fn.now(0))
+                  .notNullable();
 
                 table.primary(["user_id", "provider"]);
               });
@@ -170,7 +183,7 @@ export async function up(knex: Knex): Promise<void> {
                 table.boolean("is_active").notNullable().defaultTo(true);
 
                 table.boolean("collects_payments").notNullable();
-                table.specificType("payment_fee", "money");
+                table.specificType("payment_fee", "NUMERIC(6,2)");
 
                 table.enu("location", ["G_MEET", "ADDRESS", "PHONE"], {
                   enumName: "location_type",
@@ -181,7 +194,14 @@ export async function up(knex: Knex): Promise<void> {
                 table.string("stripe_price_id");
                 table.string("stripe_product_id");
 
-                table.timestamps(true, true);
+                table
+                  .timestamp("created_at", { precision: 0 })
+                  .defaultTo(knex.fn.now(0))
+                  .notNullable();
+                table
+                  .timestamp("updated_at", { precision: 0 })
+                  .defaultTo(knex.fn.now(0))
+                  .notNullable();
               });
             }
             return;
@@ -290,7 +310,15 @@ export async function up(knex: Knex): Promise<void> {
                 table.jsonb("processor_payload");
                 table.specificType("total_fee", "money").notNullable();
                 table.specificType("application_fee", "money").notNullable();
-                table.timestamps(true, true);
+
+                table
+                  .timestamp("created_at", { precision: 0 })
+                  .defaultTo(knex.fn.now(0))
+                  .notNullable();
+                table
+                  .timestamp("updated_at", { precision: 0 })
+                  .defaultTo(knex.fn.now(0))
+                  .notNullable();
               });
             }
             return;
@@ -349,10 +377,10 @@ export async function up(knex: Knex): Promise<void> {
                 table.string("location_value");
 
                 table
-                  .timestamp("created_at")
-                  .defaultTo(knex.fn.now())
+                  .timestamp("created_at", { precision: 0 })
+                  .defaultTo(knex.fn.now(0))
                   .notNullable();
-                table.timestamp("cancelled_at");
+                table.timestamp("cancelled_at", { precision: 0 });
               });
             }
             return;

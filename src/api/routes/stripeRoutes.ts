@@ -1,5 +1,6 @@
 import express from "express";
 import config from "../../config";
+import bodyParser from "body-parser";
 
 import {
   accountUpdateEventHandler,
@@ -15,8 +16,20 @@ const {
   sessionFailureEventUri,
 } = config.stripe;
 
-stripeRouter.post(accountUpdateEventUri, accountUpdateEventHandler);
-stripeRouter.post(sessionFailureEventUri, checkoutSessionFailureEventHandler);
-stripeRouter.post(sessionSuccessEventUri, checkoutSessionSuccessEventHandler);
+stripeRouter.post(
+  accountUpdateEventUri,
+  bodyParser.raw({ type: "application/json" }),
+  accountUpdateEventHandler
+);
+stripeRouter.post(
+  sessionFailureEventUri,
+  bodyParser.raw({ type: "application/json" }),
+  checkoutSessionFailureEventHandler
+);
+stripeRouter.post(
+  sessionSuccessEventUri,
+  bodyParser.raw({ type: "application/json" }),
+  checkoutSessionSuccessEventHandler
+);
 
 export default stripeRouter;

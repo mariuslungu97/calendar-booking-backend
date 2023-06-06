@@ -81,6 +81,7 @@ const oAuthCallbackHandler = async (
 };
 
 const calendarEventHandler = async (req: Request, res: Response) => {
+  // TODO implement token security to avoid replay attacks
   const userId = req.header("X-Goog-Channel-ID");
 
   if (!userId) return res.status(400).json({});
