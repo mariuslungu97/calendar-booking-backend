@@ -3,7 +3,7 @@ import { OAuth2Client } from "google-auth-library";
 
 import config from "../config";
 import logger from "../loaders/logger";
-import { randomString } from "../utils";
+import { randomString, createCalendarWebhookToken } from "../utils";
 
 import {
   TCreateEventInput,
@@ -144,6 +144,7 @@ const calendarApi = (
   ): Promise<boolean> => {
     const { channelId, expiration } = params;
     try {
+      const calendarToken = createCalendarWebhookToken(channelId);
       const response = await calendar.events.watch({
         calendarId,
         auth: authClient,
@@ -151,6 +152,7 @@ const calendarApi = (
           expiration,
           id: channelId,
           type: "web_hook",
+          token: calendarToken,
           address: `${config.app.uri}${config.google.calendarWebhookUri}`,
         },
       });

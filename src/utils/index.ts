@@ -1,10 +1,27 @@
 import jwt from "jsonwebtoken";
+import { createHmac } from "crypto";
 
 import config from "../config";
 
 const { jwtSecret } = config.app;
+const { calendarWebhookSecret } = config.google;
 
 import { JwtError } from "../types";
+
+const createCalendarWebhookToken = (payload: string) =>
+  createHmac("sha256", calendarWebhookSecret)
+    .update(payload)
+    .digest("base64")
+    .slice(48);
+
+const verifyCalendarToken = (token: string, payload: string) => {
+  const cmpToken = createHmac("sha256", calendarWebhookSecret)
+    .update(payload)
+    .digest("base64")
+    .slice(48);
+  if (token === cmpToken) return true;
+  return false;
+};
 
 const signPayloadJwt = (
   payload: object,
@@ -85,4 +102,6 @@ export {
   signPayloadJwt,
   decodeJwtString,
   isValidTimeZone,
+  verifyCalendarToken,
+  createCalendarWebhookToken,
 };

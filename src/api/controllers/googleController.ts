@@ -7,6 +7,8 @@ import syncApi from "../../services/calendarSync";
 import oAuthApi from "../../services/googleOAuth";
 import googleAuthStore from "../../services/googleAuthClients";
 
+import { verifyCalendarToken } from "../../utils";
+
 import { IRestApiResponse } from "../../types";
 
 type TOAuthHandlerParams = {
@@ -81,10 +83,11 @@ const oAuthCallbackHandler = async (
 };
 
 const calendarEventHandler = async (req: Request, res: Response) => {
-  // TODO implement token security to avoid replay attacks
   const userId = req.header("X-Goog-Channel-ID");
+  const token = req.header("X-Goog-Channel-Token");
 
-  if (!userId) return res.status(400).json({});
+  if (!userId || !token) return res.status(400).json({});
+  else if (!verifyCalendarToken(token, userId)) return res.status(401).json({});
 
   res.status(200).json({});
 

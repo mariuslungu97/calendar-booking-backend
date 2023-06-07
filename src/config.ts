@@ -50,6 +50,10 @@ const config = {
     calendarWebhookUri:
       process.env.APP_GOOGLE_CALENDAR_WEBHOOK_URI ||
       "/api/google/calendar/events",
+    calendarWebhookSecret: mandatoryEnv(
+      process.env.APP_GOOGLE_CALENDAR_WEBHOOK_SECRET,
+      "APP_GOOGLE_CALENDAR_WEBHOOK_SECRET"
+    ),
   },
   smtp: {
     host: process.env.APP_SMTP_HOST,
