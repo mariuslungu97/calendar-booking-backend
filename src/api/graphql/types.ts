@@ -266,13 +266,17 @@ const graphQlTypeDefs = `
   type Payment {
     id: String!
     status: PaymentStatusType!
-    payload: String!
+    totalFee: Float!
+    applicationFee: Float!
+    currency: String
+    customerEmail: String
+    customerName: String
     createdAt: String!
     updatedAt: String!
   }
 
   type PaymentConnections {
-    info: PageInfo!
+    pageInfo: PageInfo!
     edges: [Payment!]!
   }
 

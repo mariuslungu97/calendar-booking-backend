@@ -9,11 +9,13 @@ import {
   eventQueries,
   eventMutations,
 } from "./event/eventResolvers";
+import { paymentFields, paymentQueries } from "./payment/paymentResolvers";
 
 const rootQueries = {
   ...userQueries,
   ...eventTypeQueries,
   ...eventQueries,
+  ...paymentQueries,
 };
 const rootMutations = {
   ...userMutations,
@@ -25,6 +27,7 @@ const rootResolvers = {
   ...userFields,
   ...eventTypeFields,
   ...eventFields,
+  ...paymentFields,
   Query: rootQueries,
   Mutation: rootMutations,
 };
