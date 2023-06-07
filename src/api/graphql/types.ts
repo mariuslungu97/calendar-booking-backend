@@ -297,6 +297,7 @@ const graphQlTypeDefs = `
 
   type BookEventResponse {
     message: String!
+    redirect: String
   }
 
   type Query {

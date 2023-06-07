@@ -174,7 +174,7 @@ export interface Payment {
   id: string;
   user_id?: string | null;
   stripe_session_id: string;
-  stripe_payment_intent_id: string;
+  stripe_payment_intent_id?: string | null;
   status: TPaymentStatusType;
   total_fee: number;
   application_fee: number;
@@ -214,7 +214,7 @@ export interface Event {
 }
 export type TEventCreateInput = Omit<Event, "id" | "created_at">;
 export type TEventUpdateParams = Partial<
-  Omit<Event, "id" | "user_id" | "event_type_id" | "payment_id" | "created_at">
+  Omit<Event, "id" | "user_id" | "event_type_id" | "created_at">
 >;
 
 export interface EventAnswer {
@@ -379,7 +379,6 @@ export type TStripeCreateAccountLinkParams = {
 };
 
 export type TStripeCreateProductWithPriceParams = {
-  accountId: string;
   productName: string;
   unitPrice: number;
 };
@@ -387,7 +386,6 @@ export type TStripeCreateProductWithPriceParams = {
 export type TStripeArchivePriceAndProductParams = {
   priceId: string;
   productId: string;
-  accountId: string;
 };
 
 export type TStripeCreatePaymentSessionParams = {
@@ -460,7 +458,6 @@ export type TEventNotifyUpdatePayload = {
 };
 
 export type TCancelEventPayload = {
-  userFullName: string;
   eventTypeName: string;
   displayTimezone: string;
   eventDateTime: { start: string; end: string };

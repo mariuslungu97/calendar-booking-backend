@@ -151,13 +151,13 @@ const generateMailFields = (
     htmlReplacements = { userFirstName };
   } else if (type === "CANCEL_EVENT") {
     const typedPayload = payload as TCancelEventPayload;
-    const { eventTypeName, userFullName, displayTimezone, eventDateTime } =
-      typedPayload;
+    const { eventTypeName, displayTimezone, eventDateTime } = typedPayload;
 
     subject = `${name} - Cancelled Event`;
     htmlFilePath += "cancelEvent.html";
     htmlReplacements = {
-      userFullName,
+      appName: name,
+      eventType: eventTypeName,
       title: `${eventTypeName} has been cancelled!`,
       date: formatMailDate(
         eventDateTime.start,

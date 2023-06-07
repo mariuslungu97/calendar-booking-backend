@@ -156,11 +156,6 @@ class TimePeriod {
 
   isSlotAvailable(slot: TimeSlot): boolean {
     for (const timeSlot of this._schedule) {
-      console.log(
-        `IS TIME SLOT ${slot.toString()} WITHIN ${timeSlot.toString()}? ${timeSlot.isWithinBounds(
-          slot
-        )}`
-      );
       if (timeSlot.isWithinBounds(slot)) return true;
     }
 
@@ -217,14 +212,11 @@ const isTimeSlotAvailable = (
   }
 
   const timePeriod = new TimePeriod(scheduleTimeSlots);
-  console.log(`INITIAL TIME PERIOD\n${timePeriod.toString()}`);
 
   for (const bookedDayjsSlot of booked) {
     const bookedSlot = new TimeSlot(bookedDayjsSlot[0], bookedDayjsSlot[1]);
     timePeriod.erase(bookedSlot);
   }
-  console.log(`ALTERED TIME PERIOD\n${timePeriod.toString()}`);
-
   return timePeriod.isSlotAvailable(new TimeSlot(slot[0], slot[1]));
 };
 

@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import dayjs from "dayjs";
 
 import logger from "../loaders/logger";
 import config from "../config";
@@ -87,17 +88,14 @@ const createProductWithPrice = async (
   params: TStripeCreateProductWithPriceParams
 ): Promise<Stripe.Price> => {
   try {
-    const { accountId, productName, unitPrice } = params;
-    const productAndPrice = await stripe.prices.create(
-      {
-        currency: "USD",
-        unit_amount: unitPrice,
-        product_data: {
-          name: productName,
-        },
+    const { productName, unitPrice } = params;
+    const productAndPrice = await stripe.prices.create({
+      currency: "USD",
+      unit_amount: unitPrice * 100,
+      product_data: {
+        name: productName,
       },
-      { stripeAccount: accountId }
-    );
+    });
     return productAndPrice;
   } catch (err) {
     logger.info(
@@ -111,19 +109,11 @@ const archivePriceAndProduct = async (
   params: TStripeArchivePriceAndProductParams
 ): Promise<boolean> => {
   try {
-    const { accountId, priceId, productId } = params;
+    const { priceId, productId } = params;
 
-    await stripe.prices.update(
-      priceId,
-      { active: false },
-      { stripeAccount: accountId }
-    );
+    await stripe.prices.update(priceId, { active: false });
 
-    await stripe.products.update(
-      productId,
-      { active: false },
-      { stripeAccount: accountId }
-    );
+    await stripe.products.update(productId, { active: false });
 
     return true;
   } catch (err) {
@@ -140,6 +130,7 @@ const createPaymentSession = async (
       params;
     const paymentSession = await stripe.checkout.sessions.create({
       mode: "payment",
+      expires_at: dayjs().add(30, "minute").unix(),
       line_items: [
         {
           price: priceId,
@@ -147,7 +138,7 @@ const createPaymentSession = async (
         },
       ],
       payment_intent_data: {
-        application_fee_amount: applicationFee,
+        application_fee_amount: applicationFee * 100,
         transfer_data: {
           destination: accountId,
         },

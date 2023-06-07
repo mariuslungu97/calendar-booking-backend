@@ -4,16 +4,16 @@ import bodyParser from "body-parser";
 
 import {
   accountUpdateEventHandler,
-  checkoutSessionFailureEventHandler,
-  checkoutSessionSuccessEventHandler,
+  checkoutSessionExpiredEventHandler,
+  checkoutSessionCompletedEventHandler,
 } from "../controllers/stripeController";
 
 const stripeRouter = express.Router();
 
 const {
   accountUpdateEventUri,
-  sessionSuccessEventUri,
-  sessionFailureEventUri,
+  sessionExpiredEventUri,
+  sessionCompletedEventUri,
 } = config.stripe;
 
 stripeRouter.post(
@@ -22,14 +22,14 @@ stripeRouter.post(
   accountUpdateEventHandler
 );
 stripeRouter.post(
-  sessionFailureEventUri,
+  sessionExpiredEventUri,
   bodyParser.raw({ type: "application/json" }),
-  checkoutSessionFailureEventHandler
+  checkoutSessionExpiredEventHandler
 );
 stripeRouter.post(
-  sessionSuccessEventUri,
+  sessionCompletedEventUri,
   bodyParser.raw({ type: "application/json" }),
-  checkoutSessionSuccessEventHandler
+  checkoutSessionCompletedEventHandler
 );
 
 export default stripeRouter;

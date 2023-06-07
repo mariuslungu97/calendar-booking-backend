@@ -30,19 +30,11 @@ const sendCancelMail = async (eventId: string) => {
         .select("name")
         .where("id", event.event_type_id)
     )[0].name;
-    const userList = await knexClient("users")
-      .select("first_name", "last_name")
-      .where("id", event.user_id);
-    const userFullName =
-      userList.length !== 0
-        ? userList[0].first_name + userList[0].last_name
-        : "";
 
     mailService.sendMail({
       type: "CANCEL_EVENT",
       to: event.invitee_email,
       payload: {
-        userFullName,
         eventTypeName,
         displayTimezone: event.invitee_timezone,
         eventDateTime: {

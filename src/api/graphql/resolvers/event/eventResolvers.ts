@@ -28,7 +28,7 @@ import {
 
 interface EventAnswer {
   questionId: string;
-  answers: string[];
+  answer: string[];
 }
 
 interface BookEventCreateInput {
@@ -54,7 +54,7 @@ interface EventUpdateTimeParams {
   };
 }
 
-interface EventDeleteParams {
+interface EventCancelParams {
   eventId: string;
 }
 
@@ -141,9 +141,9 @@ const eventFields = {
           if (!(questionId in responseObj)) {
             responseObj[questionId] = {
               questionId,
-              answers: [eventAnswer.value],
+              answer: [eventAnswer.value],
             };
-          } else responseObj[questionId].answers.push(eventAnswer.value);
+          } else responseObj[questionId].answer.push(eventAnswer.value);
         }
 
         return Object.values(responseObj);
@@ -330,29 +330,25 @@ const eventMutations = {
         (acc, curr) => ({ ...acc, [curr.questionId]: true }),
         {}
       );
-      const mandatoryQuestionIds = eventTypeQuestions.reduce(
-        (acc, curr) => !curr.is_optional && { ...acc, [curr.id]: true },
+
+      const questionIds = eventTypeQuestions.reduce(
+        (acc, curr) => ({ ...acc, [curr.id]: curr.is_optional }),
         {}
-      );
-      const optionalQuestionIds = eventTypeQuestions.reduce(
-        (acc, curr) => curr.is_optional && { ...acc, [curr.id]: false },
-        {}
-      );
+      ) as { [id: string]: boolean };
 
       // check if all mandatory questions are answered
-      Object.keys(mandatoryQuestionIds).forEach((mandatoryQuestionId) => {
-        if (!(mandatoryQuestionId in answersQuestionIds))
-          throw new GraphQLError(
-            "You have not answered all of the mandatory questions!"
-          );
-      });
+      Object.keys(questionIds)
+        .filter((questionId) => !questionIds[questionId])
+        .forEach((mandatoryQuestionId) => {
+          if (!(mandatoryQuestionId in answersQuestionIds))
+            throw new GraphQLError(
+              "You have not answered all of the mandatory questions!"
+            );
+        });
 
       // check if question ids of provided answers exist
       Object.keys(answersQuestionIds).forEach((answerQuestionId) => {
-        if (
-          !(answerQuestionId in mandatoryQuestionIds) &&
-          !(answerQuestionId in optionalQuestionIds)
-        )
+        if (!(answerQuestionId in questionIds))
           throw new GraphQLError(
             "The id you provided for one answer's associated question does not exist!"
           );
@@ -383,10 +379,11 @@ const eventMutations = {
       const endDateTime = startDateTime.add(eventType.duration, "minute");
 
       // check if event with times is available for booking
-      const canBeBooked = await isDateAvailable(eventType, [
-        startDateTime.toISOString(),
-        endDateTime.toISOString(),
-      ]);
+      const canBeBooked = await isDateAvailable(
+        eventType,
+        [startDateTime.toISOString(), endDateTime.toISOString()],
+        inviteeTimezone
+      );
       if (!canBeBooked)
         throw new GraphQLError(
           "You cannot book the event at these start and end times!"
@@ -427,7 +424,7 @@ const eventMutations = {
       // create event answers
       const eventAnswersFields = answers
         .map((answer) => {
-          return answer.answers.map((value) => ({
+          return answer.answer.map((value) => ({
             event_id: event.id,
             question_id: answer.questionId,
             value,
@@ -497,14 +494,22 @@ const eventMutations = {
           eventId: event.id,
         });
 
-        await dbClient("payments").insert({
-          user_id: user.id,
-          application_fee: applicationFee,
-          stripe_session_id: paymentSession.id,
-          stripe_payment_intent_id: paymentSession.payment_intent as string,
-          total_fee: (eventType.payment_fee as number) + applicationFee,
-          processor_payload: JSON.stringify(paymentSession),
-        });
+        const paymentId = (
+          await dbClient("payments").insert(
+            {
+              user_id: user.id,
+              application_fee: applicationFee,
+              stripe_session_id: paymentSession.id,
+              total_fee: (eventType.payment_fee as number) + applicationFee,
+              processor_payload: JSON.stringify(paymentSession),
+            },
+            "id"
+          )
+        )[0].id;
+
+        await dbClient("events")
+          .update("payment_id", paymentId)
+          .where("id", event.id);
 
         return {
           message:
@@ -547,7 +552,8 @@ const eventMutations = {
   ): Promise<Event> => {
     try {
       const { req } = ctx;
-      if (!isLoggedIn(req)) throw new Error("You are not authenticated!");
+      if (!isLoggedIn(req))
+        throw new GraphQLError("You are not authenticated!");
       const { id: userId } = req.session.user as TUserSessionData;
 
       await updateEventTimeParamsValidationSchema.validateAsync(params);
@@ -555,6 +561,11 @@ const eventMutations = {
       const { dbClient } = ctx.services;
       const { eventId, params: updateTimeParams } = params;
       const { startDateTime, endDateTime } = updateTimeParams;
+
+      if (dayjs(startDateTime).isAfter(dayjs(endDateTime), "minute"))
+        throw new GraphQLError(
+          "You cannot update an event to have a start time greater than the end time!"
+        );
 
       const eventList = await dbClient("events")
         .select("*")
@@ -573,11 +584,6 @@ const eventMutations = {
           .select("*")
           .where("id", event.event_type_id)
       )[0];
-
-      if (!isDateAvailable(eventType, [startDateTime, endDateTime]))
-        throw new GraphQLError(
-          "The date you provided for event update is not available!"
-        );
 
       const pastDateTimes = (
         await dbClient("event_schedules")
@@ -620,7 +626,7 @@ const eventMutations = {
   },
   cancelEvent: async (
     _: any,
-    params: EventDeleteParams,
+    params: EventCancelParams,
     ctx: GraphQlContext
   ) => {
     try {
@@ -646,7 +652,7 @@ const eventMutations = {
         await dbClient("events")
           .update(
             {
-              cancelled_at: Math.round(Date.now() / 1000).toString(),
+              cancelled_at: dayjs().toISOString(),
               status: "CANCELLED",
             },
             "*"
@@ -663,11 +669,6 @@ const eventMutations = {
           .select("name")
           .where("id", cancelledEvent.event_type_id)
       )[0].name;
-      const userName = (
-        await dbClient("users")
-          .select("first_name", "last_name")
-          .where("id", cancelledEvent.user_id)
-      )[0];
 
       emailApi.sendMail({
         to: cancelledEvent.invitee_email,
@@ -675,7 +676,6 @@ const eventMutations = {
         payload: {
           displayTimezone: cancelledEvent.invitee_timezone,
           eventTypeName,
-          userFullName: userName.first_name + " " + userName.last_name,
           eventDateTime: {
             start: cancelledEventSchedule.start_date_time,
             end: cancelledEventSchedule.end_date_time,

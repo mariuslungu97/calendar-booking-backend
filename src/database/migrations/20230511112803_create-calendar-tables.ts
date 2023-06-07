@@ -299,7 +299,7 @@ export async function up(knex: Knex): Promise<void> {
                   .onDelete("SET NULL");
 
                 table.string("stripe_session_id").notNullable();
-                table.string("stripe_payment_intent_id").notNullable();
+                table.string("stripe_payment_intent_id");
 
                 table
                   .enu("status", ["WAITING", "SUCCESS", "FAIL"], {
@@ -308,8 +308,10 @@ export async function up(knex: Knex): Promise<void> {
                   })
                   .defaultTo("WAITING");
                 table.jsonb("processor_payload");
-                table.specificType("total_fee", "money").notNullable();
-                table.specificType("application_fee", "money").notNullable();
+                table.specificType("total_fee", "NUMERIC(6, 2)").notNullable();
+                table
+                  .specificType("application_fee", "NUMERIC(6, 2)")
+                  .notNullable();
 
                 table
                   .timestamp("created_at", { precision: 0 })

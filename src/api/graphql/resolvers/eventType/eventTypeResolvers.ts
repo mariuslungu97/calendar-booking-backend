@@ -525,7 +525,6 @@ const eventTypeMutations = {
           );
 
         const stripePrice = await stripeApi.createProductWithPrice({
-          accountId: user.stripe_account_id,
           productName: name,
           unitPrice: paymentFee as number,
         });
@@ -850,7 +849,6 @@ const eventTypeMutations = {
 
       if (collectsPayments && !eventType.collects_payments) {
         const priceWithProduct = await stripeApi.createProductWithPrice({
-          accountId: user.stripe_account_id,
           productName: eventType.name,
           unitPrice: paymentFee as number,
         });
@@ -864,14 +862,12 @@ const eventTypeMutations = {
         if (paymentFee !== eventType.payment_fee) {
           // fees differ => update stripe's price unit amount
           await stripeApi.archivePriceAndProduct({
-            accountId: user.stripe_account_id,
             priceId: eventType.stripe_price_id as string,
             productId: eventType.stripe_product_id as string,
           });
 
           const newPriceWithProduct = await stripeApi.createProductWithPrice({
             productName: eventType.name,
-            accountId: user.stripe_account_id,
             unitPrice: paymentFee as number,
           });
 
@@ -883,7 +879,6 @@ const eventTypeMutations = {
         }
       } else if (!collectsPayments && eventType.collects_payments) {
         await stripeApi.archivePriceAndProduct({
-          accountId: user.stripe_account_id,
           priceId: eventType.stripe_price_id as string,
           productId: eventType.stripe_product_id as string,
         });

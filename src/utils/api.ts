@@ -299,6 +299,9 @@ const retrieveAvailableTimes = async (
 
     const schedule = tzPeriods
       .filter((period) => period.day === dateStart.day())
+      .filter((period) =>
+        period.end_time.isSameOrAfter(visitorCurrentDate, "minute")
+      )
       .map((period) => [
         getFullDate(
           dateStart.format("DD-MM-YYYY"),
@@ -312,6 +315,8 @@ const retrieveAvailableTimes = async (
         ),
       ]) as TDayjsSlot[];
 
+    if (!schedule.length) return availableTimes;
+
     const bookedSlots = calendarEvents
       .map((event) => ({
         start_date_time: dateToTimezone(dayjs(event.start_date_time), timezone),
@@ -321,27 +326,6 @@ const retrieveAvailableTimes = async (
         event.start_date_time,
         event.end_date_time,
       ]) as TDayjsSlot[];
-
-    const debugFormat = `DD-MM-YYYY HH:mm Z`;
-    console.log(
-      `Checking date available times\nDATE: ${dateStartLocal.format(
-        debugFormat
-      )}`
-    );
-    schedule.forEach((period) =>
-      console.log(
-        `SCHEDULE PERIOD START: ${period[0].format(
-          debugFormat
-        )}\nSCHEDULE PERIOD END: ${period[1].format(debugFormat)}`
-      )
-    );
-    bookedSlots.forEach((bSlot) =>
-      console.log(
-        `BOOKED SLOT START: ${bSlot[0].format(
-          debugFormat
-        )}\nBOOKED SLOT END: ${bSlot[1].format(debugFormat)}`
-      )
-    );
 
     const availableTimesResult = getAvailableTimeSlots(
       schedule,
@@ -367,7 +351,8 @@ const retrieveAvailableTimes = async (
 
 const isDateAvailable = async (
   eventType: EventType,
-  date: TTimeSlotString
+  date: TTimeSlotString,
+  timezone: string
 ): Promise<boolean> => {
   try {
     // dates expected as UTC unix timestamps
@@ -402,10 +387,14 @@ const isDateAvailable = async (
         dateEndEvents.toISOString()
       );
 
+    const visitorCurrentDate = dateToTimezone(dayjs(), timezone);
     const schedule = tzPeriods
       .filter(
         (tzPeriod) =>
           tzPeriod.day === dateStart.day() || tzPeriod.day === dateEnd.day()
+      )
+      .filter((tzPeriod) =>
+        tzPeriod.end_time.isSameOrAfter(visitorCurrentDate, "minute")
       )
       .map((tzPeriod) => {
         const startTime =
@@ -432,37 +421,17 @@ const isDateAvailable = async (
         return [startTime, endTime] as TDayjsSlot;
       });
 
+    if (!schedule.length) return false;
+
     const bookedSlots = calendarEvents.map((event) => [
       dayjs(event.start_date_time),
       dayjs(event.end_date_time),
     ]) as TDayjsSlot[];
 
-    const debugFormat = `DD-MM-YYYY HH:mm Z`;
-    console.log(
-      `Checking if slot is available for booking:\nDATE START: ${dateStart.format(
-        debugFormat
-      )}\nDATE END: ${dateEnd.format(debugFormat)}`
-    );
-    schedule.forEach((period) =>
-      console.log(
-        `SCHEDULE PERIOD START: ${period[0].format(
-          debugFormat
-        )}\nSCHEDULE PERIOD END: ${period[1].format(debugFormat)}`
-      )
-    );
-    bookedSlots.forEach((bSlot) =>
-      console.log(
-        `BOOKED SLOT START: ${bSlot[0].format(
-          debugFormat
-        )}\nBOOKED SLOT END: ${bSlot[1].format(debugFormat)}`
-      )
-    );
-
     const isAvailable = isTimeSlotAvailable(schedule, bookedSlots, [
       dateStart,
       dateEnd,
     ]);
-    console.log(`IS SLOT AVAILABLE FOR BOOKING: ${isAvailable}`);
 
     return isAvailable;
   } catch (err) {

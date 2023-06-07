@@ -80,12 +80,12 @@ const config = {
     accountUpdateEventUri:
       process.env.STRIPE_ACCOUNT_UPDATE_EVENT_URI ||
       "/api/stripe/events/account",
-    sessionSuccessEventUri:
-      process.env.STRIPE_SESSION_SUCCESS_EVENT_URI ||
-      "/api/stripe/events/session/success",
-    sessionFailureEventUri:
-      process.env.STRIPE_SESSION_FAILURE_EVENT_URI ||
-      "/api/stripe/events/session/failure",
+    sessionCompletedEventUri:
+      process.env.STRIPE_CHECKOUT_COMPLETED_EVENT_URI ||
+      "/api/stripe/events/checkout/completed",
+    sessionExpiredEventUri:
+      process.env.STRIPE_CHECKOUT_EXPIRED_EVENT_URI ||
+      "/api/stripe/events/checkout/expired",
   },
   graphql: {
     path: process.env.APP_GRAPHQL_PATH || "/graphql",

@@ -64,20 +64,21 @@ const accountUpdateEventHandler = async (req: Request, res: Response) => {
   }
 };
 
-const checkoutSessionSuccessEventHandler = async (
+const checkoutSessionCompletedEventHandler = async (
   req: Request,
   res: Response
 ) => {
   const sig = req.headers["stripe-signature"] as string;
 
   try {
-    const sessionSuccessEvent = stripeApi.constructWebhookEvent({
+    const sessionCompletedEvent = stripeApi.constructWebhookEvent({
       body: req.body,
       signature: sig,
       secret: checkoutsSuccessWebhook,
     });
 
-    const session = sessionSuccessEvent.data.object as Stripe.Checkout.Session;
+    const session = sessionCompletedEvent.data
+      .object as Stripe.Checkout.Session;
 
     const { id } = session;
     const paymentRecordList = await knex("payments")
@@ -85,13 +86,14 @@ const checkoutSessionSuccessEventHandler = async (
       .where("stripe_session_id", id);
     if (!paymentRecordList.length)
       throw new Error(
-        "CheckoutSession.async_payment_succeeded: No payment record with associated session id"
+        "CheckoutSession.completed: No payment record with associated session id"
       );
 
     // update payment record
     await knex("payments")
       .update({
         status: "SUCCESS",
+        stripe_payment_intent_id: session.payment_intent as string,
         processor_payload: JSON.stringify(session),
         updated_at: dayjs().toISOString(),
       })
@@ -140,20 +142,20 @@ const checkoutSessionSuccessEventHandler = async (
   }
 };
 
-const checkoutSessionFailureEventHandler = async (
+const checkoutSessionExpiredEventHandler = async (
   req: Request,
   res: Response
 ) => {
   const sig = req.headers["stripe-signature"] as string;
 
   try {
-    const sessionFailureEvent = stripeApi.constructWebhookEvent({
+    const sessionExpiredEvent = stripeApi.constructWebhookEvent({
       body: req.body,
       signature: sig,
       secret: checkoutsFailureWebhook,
     });
 
-    const session = sessionFailureEvent.data.object as Stripe.Checkout.Session;
+    const session = sessionExpiredEvent.data.object as Stripe.Checkout.Session;
 
     const { id } = session;
     const paymentRecordList = await knex("payments")
@@ -161,7 +163,7 @@ const checkoutSessionFailureEventHandler = async (
       .where("stripe_session_id", id);
     if (!paymentRecordList.length)
       throw new Error(
-        "CheckoutSession.async_payment_failed: No payment record with associated session id"
+        "CheckoutSession.expired: No payment record with associated session id"
       );
 
     // update payment
@@ -170,6 +172,7 @@ const checkoutSessionFailureEventHandler = async (
         status: "FAIL",
         updated_at: dayjs().toISOString(),
         processor_payload: JSON.stringify(session),
+        stripe_payment_intent_id: session.payment_intent as string,
       })
       .where("id", paymentRecordList[0].id);
 
@@ -210,6 +213,6 @@ const checkoutSessionFailureEventHandler = async (
 
 export {
   accountUpdateEventHandler,
-  checkoutSessionFailureEventHandler,
-  checkoutSessionSuccessEventHandler,
+  checkoutSessionExpiredEventHandler,
+  checkoutSessionCompletedEventHandler,
 };

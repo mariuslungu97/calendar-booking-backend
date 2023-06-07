@@ -7,8 +7,14 @@ const validQuestionTypes = ["TEXT", "RADIO", "CHECKBOX"];
 
 const availableTimesParamsValidationSchema = Joi.object({
   date: Joi.string()
-    .pattern(new RegExp(/^(0?[1-9]|[12][0-9]|3[01])-(0?[1-9]|1[012])-\d{4}$/))
-    .required(),
+    .pattern(
+      new RegExp(/^([0-2][0-9]|(3)[0-1])-(((0)[0-9])|((1)[0-2]))-\d{4}$/)
+    )
+    .required()
+    .messages({
+      "string.pattern.base":
+        "The date you provide has to adhere to the following pattern: 'DD-MM-YYYY'",
+    }),
   timezone: Joi.string().custom(isValidTimeZone).required(),
 });
 
