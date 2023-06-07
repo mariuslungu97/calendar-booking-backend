@@ -21,27 +21,21 @@ interface PaymentConnections {
 }
 
 const paymentFields = {
-  totalFee: (parent: Payment) => parent.total_fee,
-  applicationFee: (parent: Payment) => parent.application_fee,
-  createdAt: (parent: Payment) => parent.created_at,
-  updatedAt: (parent: Payment) => parent.updated_at,
-  currency: (parent: Payment) => {
-    const sessionPayload = JSON.parse(
-      parent.processor_payload
-    ) as Stripe.Checkout.Session;
-    return sessionPayload.currency;
-  },
-  customerName: (parent: Payment) => {
-    const sessionPayload = JSON.parse(
-      parent.processor_payload
-    ) as Stripe.Checkout.Session;
-    return sessionPayload.customer_details?.name || null;
-  },
-  customerEmail: (parent: Payment) => {
-    const sessionPayload = JSON.parse(
-      parent.processor_payload
-    ) as Stripe.Checkout.Session;
-    return sessionPayload.customer_email;
+  Payment: {
+    totalFee: (parent: Payment) => parent.total_fee,
+    applicationFee: (parent: Payment) => parent.application_fee,
+    createdAt: (parent: Payment) => parent.created_at,
+    updatedAt: (parent: Payment) => parent.updated_at,
+    currency: (parent: Payment) =>
+      (parent.processor_payload as unknown as Stripe.Checkout.Session).currency,
+    customerName: (parent: Payment) =>
+      (parent.processor_payload as unknown as Stripe.Checkout.Session)
+        .customer_details?.name,
+    customerEmail: (parent: Payment) =>
+      (parent.processor_payload as unknown as Stripe.Checkout.Session)
+        .customer_email ||
+      (parent.processor_payload as unknown as Stripe.Checkout.Session)
+        .customer_details?.email,
   },
 };
 
